@@ -1,3 +1,0 @@
-/mnt/d/学习笔记/系统学习/malloc/my_malloc/code/my_malloc/build/CMakeFiles/my_app.dir
-/mnt/d/学习笔记/系统学习/malloc/my_malloc/code/my_malloc/build/CMakeFiles/edit_cache.dir
-/mnt/d/学习笔记/系统学习/malloc/my_malloc/code/my_malloc/build/CMakeFiles/rebuild_cache.dir
