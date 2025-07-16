@@ -1,38 +1,31 @@
-cmake_minimum_required(VERSION 3.10)
-project(mymalloc C)
+# 1. 项目基础设置
+cmake_minimum_required(VERSION 3.14)
 
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_C_STANDARD_REQUIRED ON)
+# 将项目语言设为 C++。CXX 是 CMake 为避免特殊字符和歧义而使用的标准名称。
+project(my_cpp_project CXX)
 
-# 开启测试框架
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# 2. 定义你的 C++ 库
+#    注意，这里我们用 .cpp 文件，并且库名叫 calculator
+add_library(calculator src/calculator.cpp)
+target_include_directories(calculator PUBLIC include)
+
+# 3. 配置 Google Test
+# 开启测试功能
 enable_testing()
 
-# 添加头文件目录 (这里使用 target_include_directories 是更好的现代实践)
-# include_directories(include) 
+# 包含 Google Test 的子目录
+add_subdirectory(third_party/googletest)
 
-# 构建 mymalloc 静态库
-# !! 确保你的源文件被添加进来 !!
-add_library(mymalloc STATIC 
-    src/mymalloc.c
-    # src/chunk.c, etc.
-)
-# 让 mymalloc 库知道自己的头文件在哪里
-target_include_directories(mymalloc PUBLIC include)
+# 4. 创建测试可执行文件
+#    注意，这里是 .cpp 测试文件
+add_executable(run_tests tests/test_calculator.cpp)
 
+# 5. 链接你的库和 Google Test 到测试程序
+#    链接 gtest_main，它包含了 gtest 和一个现成的 main() 函数
+target_link_libraries(run_tests PRIVATE calculator gtest_main)
 
-# ------------------- 测试目标 -------------------
-# 包含 Unity 框架
-add_subdirectory(tests/unity) 
-
-# 创建测试可执行文件
-# !! 把所有测试源文件都加进来 !!
-add_executable(run_tests
-    tests/test_main.c
-    tests/test_simple_add.c
-)
-
-# 链接 mymalloc 库和 Unity 框架到测试程序
-target_link_libraries(run_tests PRIVATE mymalloc unity)
-
-# 添加测试到 CTest
-add_test(NAME simple_add_test COMMAND run_tests)
+# 6. 将测试可执行文件注册到 CTest
+add_test(NAME CppUnitTests COMMAND run_tests)
