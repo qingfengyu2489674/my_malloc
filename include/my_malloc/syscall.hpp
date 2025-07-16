@@ -3,7 +3,6 @@
 
 #include <errno.h>
 
-// 这个基础的 clobber list 是正确的，它包含了 syscall 指令本身会破坏的寄存器
 #define _SYSCALL_BASE_CLOBBERS "cc", "rcx", "r11", "memory"
 
 #define _SYSCALL_ERROR_PROCESS(ret) \
@@ -12,7 +11,6 @@
         ret = -1; \
     }
 
-// --- SYSCALLn 宏，修正了 clobber list ---
 
 #define SYSCALL0(num) \
     ({ \
