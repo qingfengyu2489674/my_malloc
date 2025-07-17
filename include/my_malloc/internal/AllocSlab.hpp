@@ -26,10 +26,14 @@ public:
 
     uint64_t bitmap[1];
 
+    SmallSlabHeader() 
+        : prev(this), next(this), free_count(0), slab_class_id(UINT16_MAX) 
+    {}
+
+    explicit SmallSlabHeader(uint16_t slab_class_id);
+
     SmallSlabHeader(const SmallSlabHeader&) = delete;
     SmallSlabHeader& operator=(const SmallSlabHeader&) = delete;
-
-    void init(uint16_t slab_class_id);
 
     void* allocate_block();
 

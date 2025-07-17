@@ -10,22 +10,19 @@
 namespace my_malloc {
 namespace internal {
 
-void SmallSlabHeader::init(uint16_t slab_class_id) {
-    // 1. 记录自己的“身份”
+SmallSlabHeader::SmallSlabHeader(uint16_t slab_class_id) {
     this->slab_class_id = slab_class_id;
 
-    // 2. 查询全局配置，获取所有规格信息
     const SlabConfig& config = SlabConfig::get_instance();
     const SlabConfigInfo& info = config.get_info(slab_class_id);
 
-    // 3. 根据规格，初始化自身状态
     this->free_count = info.slab_capacity;
 
-    // 4. 初始化位图 (bitmap)，将所有位设为 1，表示所有块都空闲
+    // 初始化位图 (bitmap)，将所有位设为 1，表示所有块都空闲
     size_t bitmap_uint64_count = (info.slab_capacity + 63) / 64;
     memset(this->bitmap, 0xFF, bitmap_uint64_count * sizeof(uint64_t));
 
-    // 5. (关键) 清除最后一个 uint64_t 中多余的、无效的位
+    // (关键) 清除最后一个 uint64_t 中多余的、无效的位
     size_t remainder = info.slab_capacity % 64;
     if (remainder > 0) {
         // 创建一个掩码，只有低 `remainder` 位是 1
@@ -33,7 +30,7 @@ void SmallSlabHeader::init(uint16_t slab_class_id) {
         this->bitmap[bitmap_uint64_count - 1] &= mask;
     }
 
-    // 6. 初始化链表指针，表示暂不属于任何链表
+    // 初始化链表指针，表示暂不属于任何链表
     this->prev = nullptr;
     this->next = nullptr;
 }
@@ -52,7 +49,7 @@ void* SmallSlabHeader::allocate_block() {
     // 遍历位图，查找第一个为 1 (空闲) 的位
     for (size_t i = 0; i < bitmap_uint64_count; ++i) {
         if (this->bitmap[i] == 0) {
-            continue; // 这个 uint64_t 中没有空闲块，跳过
+            continue;
         }
 
         // --- 使用 CPU 内建指令高效查找第一个为 1 的位 ---
@@ -86,7 +83,6 @@ void* SmallSlabHeader::allocate_block() {
         return start_of_blocks + block_index * info.block_size;
     }
 
-    // 理论上不应该执行到这里，因为 is_full() 已经检查过了
     assert(false && "Slab is not full, but no free block was found.");
     return nullptr;
 }
@@ -95,25 +91,23 @@ void SmallSlabHeader::free_block(void* ptr) {
     const SlabConfig& config = SlabConfig::get_instance();
     const SlabConfigInfo& info = config.get_info(this->slab_class_id);
 
-    // 1. 计算 ptr 相对于数据区的偏移，反推出 block_index
+    // 计算 ptr 相对于数据区的偏移，反推出 block_index
     char* start_of_blocks = reinterpret_cast<char*>(this) + info.slab_metadata_size;
     ptrdiff_t offset = static_cast<char*>(ptr) - start_of_blocks;
 
-    // 安全检查
     assert(offset >= 0 && "Pointer is before the start of the slab's data area.");
     assert(offset % info.block_size == 0 && "Pointer is not aligned to a block boundary.");
 
     size_t block_index = offset / info.block_size;
     assert(block_index < info.slab_capacity && "Pointer maps to an out-of-bounds block index.");
 
-    // 2. 计算在位图中的位置
+    // 计算在位图中的位置
     size_t word_index = block_index / 64;
     size_t bit_index = block_index % 64;
 
-    // 3. 安全检查 (防范 double-free)
     assert(((this->bitmap[word_index] >> bit_index) & 1) == 0 && "Attempting to double-free a block.");
 
-    // 4. 标记该位为 1 (空闲)
+    // 标记该位为 1 (空闲)
     this->bitmap[word_index] |= (1ULL << bit_index);
     this->free_count++;
 }

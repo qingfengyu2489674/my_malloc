@@ -19,7 +19,7 @@ size_t SlabConfig::get_size_class_index(size_t size) const {
         // 使用 SIZE_MAX 是一个清晰的信号。
         return static_cast<size_t>(-1);
     }
-    // O(1) 查找
+
     return size_to_class_map_[size];
 }
 
