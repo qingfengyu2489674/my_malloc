@@ -86,6 +86,10 @@ public:
 private:
     // 私有构造函数，在首次调用 get_instance() 时执行初始化。
     SlabConfig(); 
+
+    void initialize_size_classes();
+    void calculate_derived_parameters();
+    void build_lookup_table();
     
     // 禁止拷贝和移动，以维护单例模式。
     SlabConfig(const SlabConfig&) = delete;

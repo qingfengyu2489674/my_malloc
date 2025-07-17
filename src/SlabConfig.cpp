@@ -29,67 +29,72 @@ const SlabConfigInfo& SlabConfig::get_info(size_t index) const {
 }
 
 SlabConfig::SlabConfig() : num_classes_(0) {
-    // --- Phase 1: 初始化尺寸类别和它们的 slab_pages ---
+    initialize_size_classes();
+    calculate_derived_parameters();
+    build_lookup_table();
+}
 
-    size_t current_block_size = 0;
 
+void SlabConfig::initialize_size_classes() {
     auto add_class = [&](size_t block_size, uint16_t base_slab_pages) {
         if (num_classes_ >= MAX_NUM_SIZE_CLASSES) return;
         
         SlabConfigInfo& info = slab_class_infos_[num_classes_];
         info.block_size = block_size;
         
-        // 动态决定 slab_pages，这里采用一个简单的策略
         uint16_t pages = base_slab_pages;
-        // 确保 Slab 大小至少是 block_size 的8倍，且不超过 64 页 (256KB)
+
         size_t min_pages = (block_size * 8 + PAGE_SIZE -1) / PAGE_SIZE;
         pages = std::max(pages, static_cast<uint16_t>(min_pages));
-        // pages = std::min(pages, static_cast<uint16_t>(64));
-        pages = std::min(pages, static_cast<uint16_t>(128));
-        info.slab_pages = pages;
+
+        const uint16_t max_allowed_pages = (SEGMENT_SIZE / PAGE_SIZE) / 2;
+        pages = std::min(pages, max_allowed_pages);
         
+        info.slab_pages = pages;
         num_classes_++;
     };
     
     // 我们的混合增长策略 (88 个类别)
-    // [1, 128B]: 步长 8B
-    for (current_block_size = 8; current_block_size <= 128; current_block_size += 8) {
-        add_class(current_block_size, 4); // 16KB Slabs
-    }
-    // (128B, 256B]: 步长 16B
-    for (current_block_size = 128 + 16; current_block_size <= 256; current_block_size += 16) {
-        add_class(current_block_size, 4); // 16KB Slabs
-    }
-    // (256B, 512B]: 步长 32B
-    for (current_block_size = 256 + 32; current_block_size <= 512; current_block_size += 32) {
-        add_class(current_block_size, 8); // 32KB Slabs
-    }
-    // (512B, 1KB]: 步长 64B
-    for (current_block_size = 512 + 64; current_block_size <= 1024; current_block_size += 64) {
-        add_class(current_block_size, 8); // 32KB Slabs
+    for (size_t block_size = 8; block_size <= MAX_SMALL_OBJECT_SIZE; ) {
+        
+        uint16_t suggested_pages;
+
+        if (block_size <= 1024) {
+            suggested_pages = 16;
+        } 
+        else if (block_size <= 64 * 1024) {
+            suggested_pages = (block_size * 8 + PAGE_SIZE - 1) / PAGE_SIZE;
+        }
+        else {
+            suggested_pages = (block_size * 2 + PAGE_SIZE - 1) / PAGE_SIZE;
+        }
+        
+        add_class(block_size, suggested_pages);
+
+        if (block_size < 128) {
+            block_size += 8;
+        } else if (block_size < 256) {
+            block_size += 16;
+        } else if (block_size < 512) {
+            block_size += 32;
+        } else if (block_size < 1024) {
+            block_size += 64;
+        } else if (block_size < 4096) {
+            block_size += 256;
+        } else if (block_size < 16384) {
+            block_size += 1024;
+        } else if (block_size < 65536) {
+            block_size += 4096;
+        } else {
+            block_size += 16384;
+        }
     }
 
-    // (1KB, 4KB]: 步长 256B
-    for (current_block_size = 1024 + 256; current_block_size <= 4096; current_block_size += 256) {
-        add_class(current_block_size, 16); // 64KB Slabs
-    }
-    // (4KB, 16KB]: 步长 1KB
-    for (current_block_size = 4096 + 1024; current_block_size <= 16384; current_block_size += 1024) {
-        add_class(current_block_size, 16); // 64KB Slabs
-    }
-    // (16KB, 64KB]: 步长 4KB
-    for (current_block_size = 16384 + 4096; current_block_size <= 65536; current_block_size += 4096) {
-        add_class(current_block_size, 32); // 128KB Slabs
-    }
-    // (64KB, 256KB]: 步长 16KB
-    for (current_block_size = 65536 + 16384; current_block_size <= 262144; current_block_size += 16384) {
-        add_class(current_block_size, 64); // 256KB Slabs; 
-    }
-    
     assert(num_classes_ < MAX_NUM_SIZE_CLASSES && "Exceeded max size classes");
+}
 
-    // --- Phase 2: 计算每个类别的派生参数 (capacity, metadata_size) ---
 
+void SlabConfig::calculate_derived_parameters() {
     for (size_t i = 0; i < num_classes_; ++i) {
         SlabConfigInfo& info = slab_class_infos_[i];
         
@@ -116,9 +121,10 @@ SlabConfig::SlabConfig() : num_classes_(0) {
         info.slab_capacity = best_capacity;
         assert(info.slab_capacity > 0 && "Calculated capacity is zero, check logic.");
     }
-    
-    // --- Phase 3: 初始化 size_to_class_map_ 快速查找表 ---
-    
+}
+
+
+void SlabConfig::build_lookup_table() {
     size_t current_class = 0;
     for (size_t size = 1; size <= MAX_SMALL_OBJECT_SIZE; ++size) {
         // 如果当前 size 超过了当前 class 的 block_size，就移动到下一个 class

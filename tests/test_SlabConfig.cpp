@@ -120,3 +120,54 @@ TEST_F(SlabConfigTest, GetInfoBoundsCheck) {
     GTEST_LOG_(INFO) << "Skipping death test for get_info in release mode.";
 #endif
 }
+
+// 在 SlabConfigTest 测试套件中新增一个测试用例
+TEST_F(SlabConfigTest, SizeToClassMapBoundariesArePerfect) {
+    // 遍历除最后一个之外的所有类别
+    for (size_t i = 0; i < config_->get_num_classes() - 1; ++i) {
+        SCOPED_TRACE("Testing boundary between class " + std::to_string(i) + " and " + std::to_string(i + 1));
+        
+        const SlabConfigInfo& current_info = config_->get_info(i);
+        const size_t current_block_size = current_info.block_size;
+
+        // 验证：请求大小正好等于当前 block_size 时，应该映射到当前类别 i
+        EXPECT_EQ(config_->get_size_class_index(current_block_size), i);
+
+        // 验证：请求大小比当前 block_size 大 1 时，应该映射到下一个类别 i+1
+        if (current_block_size < MAX_SMALL_OBJECT_SIZE) {
+            EXPECT_EQ(config_->get_size_class_index(current_block_size + 1), i + 1);
+        }
+    }
+}
+
+
+// 在 SlabConfigTest 测试套件中新增一个测试用例
+TEST_F(SlabConfigTest, SpecificClassInfoIsCalculatedAsExpected) {
+    // --- 测试一个小的类别，例如 block_size=8 ---
+    size_t idx_8b = config_->get_size_class_index(8);
+    // 确保我们找到了正确的类别
+    ASSERT_EQ(config_->get_info(idx_8b).block_size, 8);
+    
+    // 我们期望它的 slab_pages 是 16 (64KB)，因为这是小块的策略
+    // (注意：如果SlabConfig的策略改变，这个硬编码的值也需要改变)
+    const SlabConfigInfo& info_8b = config_->get_info(idx_8b);
+    EXPECT_EQ(info_8b.slab_pages, 16);
+    // 我们可以手动计算出 capacity 和 metadata_size 的期望值，然后进行比对
+    // (这个计算比较繁琐，但对于核心类别来说是值得的)
+    // EXPECT_EQ(info_8b.slab_capacity, EXPECTED_CAPACITY_FOR_8B);
+
+
+    // --- 测试一个大的类别，例如 block_size=100KB ---
+    size_t size_100k = 100 * 1024;
+    size_t idx_100k = config_->get_size_class_index(size_100k);
+    const SlabConfigInfo& info_100k = config_->get_info(idx_100k);
+
+    // 验证它的 block_size 是第一个大于等于 100KB 的
+    EXPECT_GE(info_100k.block_size, size_100k);
+    if (idx_100k > 0) {
+        EXPECT_LT(config_->get_info(idx_100k - 1).block_size, size_100k);
+    }
+    
+    // 验证它的 capacity 至少为 1
+    EXPECT_GE(info_100k.slab_capacity, 1);
+}
