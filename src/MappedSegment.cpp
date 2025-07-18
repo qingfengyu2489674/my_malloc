@@ -67,6 +67,53 @@ void MappedSegment::destroy(MappedSegment* segment) {
     munmap(segment, SEGMENT_SIZE);
 }
 
+void* MappedSegment::find_and_allocate_slab(uint16_t num_pages) {
+    // 检查是否还有足够的剩余空间
+    if (next_free_page_idx_ + num_pages > (SEGMENT_SIZE / PAGE_SIZE)) {
+        return nullptr; // 空间不足
+    }
+    
+    // 如果是第一次从这个 Segment 分配，需要跳过元数据区域
+    if (next_free_page_idx_ == 0) {
+        // 我们需要计算元数据占了多少页
+        const size_t metadata_bytes = sizeof(MappedSegment);
+        // 向上取整计算页数
+        const size_t metadata_pages = (metadata_bytes + PAGE_SIZE - 1) / PAGE_SIZE;
+
+        // 标记这些页为元数据
+        for (size_t i = 0; i < metadata_pages; ++i) {
+            page_descriptors_[i].status = PageStatus::METADATA_START;
+        }
+        
+        next_free_page_idx_ = metadata_pages;
+
+        // 再次检查分配是否会超出范围
+        if (next_free_page_idx_ + num_pages > (SEGMENT_SIZE / PAGE_SIZE)) {
+            return nullptr;
+        }
+    }
+
+    // 分配空间
+    const uint16_t start_page_idx = next_free_page_idx_;
+    void* slab_ptr = reinterpret_cast<char*>(this) + (start_page_idx * PAGE_SIZE);
+
+    // 更新 Page Descriptors
+    PageDescriptor* start_desc = &page_descriptors_[start_page_idx];
+    start_desc->status = PageStatus::SLAB_START;
+    start_desc->num_pages = num_pages;
+    start_desc->slab_ptr = static_cast<AllocSlab*>(slab_ptr);
+
+    for (uint16_t i = 1; i < num_pages; ++i) {
+        page_descriptors_[start_page_idx + i].status = PageStatus::SLAB_SUBPAGE;
+        page_descriptors_[start_page_idx + i].slab_ptr = static_cast<AllocSlab*>(slab_ptr);
+    }
+
+    // 更新下一个空闲页的索引
+    next_free_page_idx_ += num_pages;
+
+    return slab_ptr;
+}
+
 #if defined(MY_MALLOC_TESTING)
 
 MappedSegment* MappedSegment::create_for_test() {

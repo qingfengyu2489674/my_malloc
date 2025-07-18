@@ -27,6 +27,7 @@ class AllocSlab;
 
 struct PageDescriptor {
     PageStatus status = PageStatus::FREE;
+    uint16_t num_pages;
     AllocSlab* slab_ptr = nullptr;
 };
 

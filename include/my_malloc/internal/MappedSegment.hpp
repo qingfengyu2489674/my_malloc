@@ -54,6 +54,8 @@ public:
 
     size_t get_metadata_size_from_descriptor() const;
 
+    void* find_and_allocate_slab(uint16_t num_pages);
+
 private:
 
     // 测试用
@@ -69,6 +71,8 @@ private:
 
     ThreadHeap* owner_heap_;
     PageDescriptor page_descriptors_[SEGMENT_SIZE / PAGE_SIZE];
+
+    uint16_t next_free_page_idx_ = 0;
 };
 
 
