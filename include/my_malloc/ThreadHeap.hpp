@@ -28,17 +28,6 @@ class MappedSegment;
  */
 class ThreadHeap {
     public:
-
-#if defined(MY_MALLOC_TESTING)
-    void set_internal_segments_for_test(
-        internal::MappedSegment* active_head,
-        internal::MappedSegment* free_head)
-    {
-        active_segments_ = active_head;
-        free_segments_ = free_head;
-    }
-#endif
-
     /**
      * @brief 构造函数。初始化所有内部数据结构。
      */
@@ -78,7 +67,7 @@ class ThreadHeap {
      */
     void push_pending_free(void* ptr);
 
-private:
+// private:
     // --- 私有内嵌数据结构 ---
 
     // 用于管理特定尺寸 SmallSlab 的容器，本质是一个双向链表头。

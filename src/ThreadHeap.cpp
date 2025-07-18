@@ -68,10 +68,40 @@ ThreadHeap::~ThreadHeap() {
 // ### 函数实现占位符 (待后续阶段填充)                                     ###
 // #############################################################################
 
+// in: src/ThreadHeap.cpp
+
 void* ThreadHeap::allocate(size_t size) {
-    // TODO: 阶段三实现
-    return nullptr;
+    // 0. 处理无效请求
+    if (size == 0) {
+        return nullptr;
+    }
+
+    // (我们将在下一个阶段实现小对象分配，这里先跳过)
+    // if (size <= MAX_SMALL_OBJECT_SIZE) {
+    //     // ... 小对象分配逻辑 ...
+    // }
+
+    // ==========================================================
+    // ### 大对象分配逻辑 (Large Object Allocation) ###
+    // ==========================================================
+
+    // 1. 计算满足 size 需要多少个页
+    //    除了 size 本身，我们还需要一个 PageDescriptor 的空间来跟踪这次分配，
+    //    但 PageDescriptor 已经存在于 MappedSegment 的元数据中了，所以这里不需要额外空间。
+    //    我们只需要计算 size 跨越了多少个页。
+    const size_t num_pages = (size + internal::PAGE_SIZE - 1) / internal::PAGE_SIZE;
+
+    // 2. 调用 acquire_slab 获取连续的内存页
+    //    我们直接将计算出的页数传递给我们已经测试过的核心函数。
+    void* ptr = acquire_slab(static_cast<uint16_t>(num_pages));
+
+    // 3. 返回指针
+    //    acquire_slab 已经处理了所有失败情况（返回 nullptr）。
+    //    我们在这里直接返回它的结果即可。
+    return ptr;
 }
+
+// ... (rest of the file)
 
 void ThreadHeap::free(void* ptr) {
     // TODO: 阶段四/五实现
@@ -91,10 +121,64 @@ void ThreadHeap::process_pending_frees() {
     // TODO: 阶段五实现
 }
 
+// file: src/ThreadHeap.cpp
+
 void* ThreadHeap::acquire_slab(uint16_t num_pages) {
-    // TODO: 阶段二实现
-    return nullptr;
+    if (num_pages == 0 || num_pages > (internal::SEGMENT_SIZE / internal::PAGE_SIZE)) {
+        return nullptr;
+    }
+
+    // ===============================================
+    // ### 优先级 2: 从 active_segments_ 切割 ###
+    // ===============================================
+    // 遍历当前所有的 active segment，尝试在其中找到空间
+    internal::MappedSegment* current_seg = active_segments_;
+    while (current_seg) {
+        // 使用你已经实现的、简单的线性分配函数
+        void* slab = current_seg->find_and_allocate_slab(num_pages);
+        if (slab != nullptr) {
+            // 在现有的 segment 中成功找到了空间，直接返回
+            return slab;
+        }
+        // 当前 segment 空间不足 (水位线太高)，继续检查下一个
+        current_seg = current_seg->list_node.next;
+    }
+
+    // ===========================================
+    // ### 优先级 3: 启用 free_segments_ ###
+    // ===========================================
+    // (我们暂时不实现这个，因为 free_segments_ 链表目前为空，
+    // 只有在实现了 free 功能后它才会有内容。所以这部分逻辑暂时可以省略)
+
+
+    // ======================================================
+    // ### 优先级 4: 向 OS 申请新 Segment ###
+    // ======================================================
+    // 如果所有现有的 active segment 都满了，就需要创建一个新的
+    internal::MappedSegment* new_seg = internal::MappedSegment::create();
+    if (new_seg == nullptr) {
+        return nullptr; // 系统内存耗尽
+    }
+    
+    new_seg->set_owner_heap(this);
+
+    // 将新 segment 加入到 active 链表的头部
+    new_seg->list_node.next = active_segments_;
+    active_segments_ = new_seg;
+
+    // 在这个全新的 segment 中进行分配
+    void* slab = new_seg->find_and_allocate_slab(num_pages);
+    
+    if (slab == nullptr) {
+        // 防御性代码：请求的大小对于一个新 segment 也太大了
+        active_segments_ = new_seg->list_node.next; // 撤销操作
+        internal::MappedSegment::destroy(new_seg);
+        return nullptr;
+    }
+    
+    return slab;
 }
+
 
 void ThreadHeap::release_slab(void* slab_ptr, uint16_t num_pages) {
     // TODO: 阶段四实现

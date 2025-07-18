@@ -22,13 +22,6 @@ namespace internal {
  */
 class MappedSegment {
 public:
-
-    // ================== 测试后门 ==================
-#if defined(MY_MALLOC_TESTING)
-    static MappedSegment* create_for_test();
-#endif
-    // ===============================================
-
     struct ListNode {
         MappedSegment* next = nullptr;
         MappedSegment* prev = nullptr;
@@ -56,10 +49,7 @@ public:
 
     void* find_and_allocate_slab(uint16_t num_pages);
 
-private:
-
-    // 测试用
-    // friend class ::my_malloc::ThreadHeapDestructorTest;
+// private:
 
     MappedSegment();
     ~MappedSegment();

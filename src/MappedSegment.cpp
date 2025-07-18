@@ -114,16 +114,6 @@ void* MappedSegment::find_and_allocate_slab(uint16_t num_pages) {
     return slab_ptr;
 }
 
-#if defined(MY_MALLOC_TESTING)
-
-MappedSegment* MappedSegment::create_for_test() {
-    // 分配内存
-    void* mem = ::operator new(sizeof(MappedSegment));
-    // 使用 placement new 调用私有构造函数
-    return new (mem) MappedSegment();
-}
-
-#endif
 
 } // namespace internal
 } // namespace my_malloc

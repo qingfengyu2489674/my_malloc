@@ -61,7 +61,7 @@ public:
     // @brief 获取已初始化的尺寸类别的总数。
     size_t get_num_classes() const { return num_classes_; }
 
-private:
+// private:
     // 私有构造函数，在首次调用 get_instance() 时执行初始化。
     SlabConfig(); 
 

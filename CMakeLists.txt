@@ -7,13 +7,10 @@ project(my_malloc C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# 保持这个设置，它对 IDE 支持非常有帮助
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# -------------------- 这是核心逻辑 --------------------
-# 添加一个全局的构建选项，用于控制是否启用测试“后门”
-# 默认是 OFF (关闭)，以保证发行版的代码是干净的
-option(MY_MALLOC_ENABLE_TESTING "Enable internal testing hooks and backdoors" OFF)
-# ----------------------------------------------------
+# --- option() 已经被移除，不再需要 ---
 
 # 2. 将 src 目录的构建任务委托给 src/CMakeLists.txt
 add_subdirectory(src)
