@@ -11,7 +11,7 @@
 
 namespace my_malloc {
 
-// 测试 acquire_slab 的功能
+// 测试 acquire_large_slab 的功能
 class AcquireSlabTest : public ::testing::Test {
 protected:
     ThreadHeap* heap_ = nullptr;
@@ -69,7 +69,7 @@ TEST_F(AcquireSlabTest, FromNewSegmentWhenHeapIsEmpty) {
     // 初始时 active_segments_ 应该为 null
     ASSERT_EQ(heap_->active_segments_, nullptr);
     
-    void* slab = heap_->acquire_slab(1);
+    void* slab = heap_->acquire_large_slab(1);
     ASSERT_NE(slab, nullptr);
 
     // 验证 heap 的 active_segments_ 链表现在有了一个节点
@@ -90,12 +90,12 @@ TEST_F(AcquireSlabTest, FromExistingActiveSegmentWithSpace) {
     heap_->active_segments_ = seg1;
     
     // 操作1: 请求 10 页内存。
-    void* slab1 = heap_->acquire_slab(10);
+    void* slab1 = heap_->acquire_large_slab(10);
     ASSERT_NE(slab1, nullptr);
     EXPECT_EQ(internal::MappedSegment::from_ptr(slab1), seg1);
 
     // 操作2: 再次请求 20 页内存。
-    void* slab2 = heap_->acquire_slab(20);
+    void* slab2 = heap_->acquire_large_slab(20);
     ASSERT_NE(slab2, nullptr);
     EXPECT_EQ(internal::MappedSegment::from_ptr(slab2), seg1);
 
@@ -116,12 +116,12 @@ TEST_F(AcquireSlabTest, FallbackToNewSegmentWhenActiveIsFull) {
     const size_t metadata_pages = (sizeof(internal::MappedSegment) + internal::PAGE_SIZE - 1) / internal::PAGE_SIZE;
     const uint16_t available_pages = total_pages - metadata_pages;
     
-    void* slab1 = heap_->acquire_slab(available_pages);
+    void* slab1 = heap_->acquire_large_slab(available_pages);
     ASSERT_NE(slab1, nullptr);
     EXPECT_EQ(internal::MappedSegment::from_ptr(slab1), seg1);
     
-    // 操作2: 再次请求 1 页。此时 seg1 应该返回 nullptr，迫使 acquire_slab 创建新 segment。
-    void* slab2 = heap_->acquire_slab(1);
+    // 操作2: 再次请求 1 页。此时 seg1 应该返回 nullptr，迫使 acquire_large_slab 创建新 segment。
+    void* slab2 = heap_->acquire_large_slab(1);
     ASSERT_NE(slab2, nullptr);
 
     // 验证: 新的 slab2 应该来自一个新的 segment (seg2)，并且这个新 segment 现在是链表头。
@@ -136,10 +136,10 @@ TEST_F(AcquireSlabTest, FallbackToNewSegmentWhenActiveIsFull) {
 
 // 测试用例 4 & 5: 边界条件测试
 // ===================================================================================
-// 验证的逻辑: `acquire_slab` 和 `find_and_allocate_slab` 的参数检查和空间计算
+// 验证的逻辑: `acquire_large_slab` 和 `find_and_allocate_slab` 的参数检查和空间计算
 TEST_F(AcquireSlabTest, RequestSlabLargerThanSegment) {
     const uint16_t too_large_pages = (internal::SEGMENT_SIZE / internal::PAGE_SIZE) + 1;
-    void* slab = heap_->acquire_slab(too_large_pages);
+    void* slab = heap_->acquire_large_slab(too_large_pages);
     EXPECT_EQ(slab, nullptr);
 }
 
@@ -148,11 +148,11 @@ TEST_F(AcquireSlabTest, RequestSlabSlightlyTooLargeForNewSegment) {
     const uint16_t max_possible_pages = (internal::SEGMENT_SIZE / internal::PAGE_SIZE) - metadata_pages;
     
     // 请求一个比最大可能值多一页的 slab，应该失败
-    void* slab = heap_->acquire_slab(max_possible_pages + 1);
+    void* slab = heap_->acquire_large_slab(max_possible_pages + 1);
     EXPECT_EQ(slab, nullptr);
     
     // 请求一个正好是最大可能值的 slab，应该成功
-    void* slab2 = heap_->acquire_slab(max_possible_pages);
+    void* slab2 = heap_->acquire_large_slab(max_possible_pages);
     EXPECT_NE(slab2, nullptr);
 }
 

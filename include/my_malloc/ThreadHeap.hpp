@@ -115,7 +115,7 @@ class ThreadHeap {
      * 假定调用者已经获取了锁。
      * @param ptr 待释放的指针。
      */
-    void internal_free(void* ptr);
+    void slab_free(void* ptr);
 
     /**
      * @brief 处理积压的跨线程释放请求。
@@ -125,7 +125,9 @@ class ThreadHeap {
     /**
      * @brief 资源获取的核心：按需获取一块指定页数大小的连续内存。
      */
-    void* acquire_slab(uint16_t num_pages);
+    void* acquire_large_slab(uint16_t num_pages);
+
+    void* acquire_pages(uint16_t num_pages);
 
     /**
      * @brief 资源回收的核心：将一块完全空闲的 Slab 归还到系统中。

@@ -76,53 +76,52 @@ void MappedSegment::destroy(MappedSegment* segment) {
 }
 
 
-// 用这个新函数替换旧的 find_and_allocate_slab
-void* MappedSegment::linear_allocate_pages(uint16_t num_pages, PageStatus start_status, PageStatus cont_status) {
-    // 检查是否还有足够的剩余空间 (这部分逻辑不变)
+// in: src/MappedSegment.cpp
+
+/**
+ * @brief [重构后] 使用简单的线性分配器划分出一块连续的页面。
+ * 
+ * 此函数的唯一职责是找到下一个可用的、包含 num_pages 个页面的连续块。
+ * 它 **不会** 设置所分配页面的状态，这个责任属于调用者。
+ * 它 **会** 处理 Segment 自身元数据页的一次性初始化。
+ * 
+ * @param num_pages 要连续分配的页面数量。
+ * @return 指向已分配页面起始位置的指针；如果空间不足，则返回 nullptr。
+ */
+void* MappedSegment::linear_allocate_pages(uint16_t num_pages) {
+    // 检查是否还有足够的剩余空间。
     if (next_free_page_idx_ + num_pages > (SEGMENT_SIZE / PAGE_SIZE)) {
         return nullptr;
     }
     
-    // 如果是第一次从这个 Segment 分配，需要跳过元数据区域 (逻辑不变)
+    // 如果这是第一次从这个 Segment 分配，我们必须首先为 MappedSegment 元数据本身留出空间。
     if (next_free_page_idx_ == 0) {
         const size_t metadata_pages = (sizeof(MappedSegment) + PAGE_SIZE - 1) / PAGE_SIZE;
 
-        // 标记元数据页 (使用你设计的新状态)
+        // 标记元数据页。这是 MappedSegment 的内部事务。
         page_descriptors_[0].status = PageStatus::METADATA_START;
         for (size_t i = 1; i < metadata_pages; ++i) {
             page_descriptors_[i].status = PageStatus::METADATA_CONT;
         }
         
+        // 将“水位线”移过元数据区域。
         next_free_page_idx_ = metadata_pages;
 
-        // 再次检查
+        // 在留出元数据空间后，再次检查空间是否充足。
         if (next_free_page_idx_ + num_pages > (SEGMENT_SIZE / PAGE_SIZE)) {
             return nullptr;
         }
     }
 
-    // 分配空间 (逻辑不变)
+    // 分配空间
     const uint16_t start_page_idx = next_free_page_idx_;
-    void* slab_ptr = reinterpret_cast<char*>(this) + (start_page_idx * PAGE_SIZE);
+    void* allocated_pages = reinterpret_cast<char*>(this) + (start_page_idx * PAGE_SIZE);
 
-    // ==========================================================
-    // ### 关键改变：使用传入的参数来更新 Page Descriptors ###
-    // ==========================================================
-    PageDescriptor* start_desc = &page_descriptors_[start_page_idx];
-    start_desc->status = start_status; // 使用调用者指定的起始状态
-    start_desc->num_pages = num_pages;
-    start_desc->slab_ptr = static_cast<AllocSlab*>(slab_ptr); // slab_ptr 的类型应该是 void*
-
-    for (uint16_t i = 1; i < num_pages; ++i) {
-        page_descriptors_[start_page_idx + i].status = cont_status; // 使用调用者指定的后续状态
-        page_descriptors_[start_page_idx + i].slab_ptr = static_cast<AllocSlab*>(slab_ptr);
-    }
-    // ==========================================================
-
-    // 更新下一个空闲页的索引 (逻辑不变)
+    // 更新下一个空闲页的索引。
     next_free_page_idx_ += num_pages;
 
-    return slab_ptr;
+    // 返回纯净的、未被标记状态的内存指针。
+    return allocated_pages;
 }
 
 } // namespace internal
