@@ -29,7 +29,7 @@ public:
 
     ListNode list_node;
 
-    static MappedSegment* create();
+    static MappedSegment* create(size_t segment_size = SEGMENT_SIZE);
     static void destroy(MappedSegment* segment);
 
     static MappedSegment* from_ptr(const void* ptr);
@@ -61,6 +61,8 @@ public:
 
     ThreadHeap* owner_heap_;
     PageDescriptor page_descriptors_[SEGMENT_SIZE / PAGE_SIZE];
+    
+    size_t total_size_;
 
     uint16_t next_free_page_idx_ = 0;
 };

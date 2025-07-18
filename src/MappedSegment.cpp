@@ -28,43 +28,52 @@ MappedSegment::MappedSegment() : owner_heap_(nullptr) {
 MappedSegment::~MappedSegment() {
 }
 
-MappedSegment* MappedSegment::create() {
-    void* base_ptr = mmap(nullptr, MMAP_BUFFER_SIZE, PROT_READ | PROT_WRITE,
-                          MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+MappedSegment* MappedSegment::create(size_t segment_size /* = SEGMENT_SIZE */) {
+    // 1. 使用“过量申请再裁剪”技巧来保证 SEGMENT_SIZE 对齐
+    const size_t mmap_buffer_size = segment_size + (SEGMENT_SIZE - PAGE_SIZE);
 
+    void* base_ptr = ::mmap(nullptr, mmap_buffer_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (base_ptr == MAP_FAILED) {
         return nullptr;
     }
 
+    // 2. 计算对齐后的地址
     uintptr_t base_addr_val = reinterpret_cast<uintptr_t>(base_ptr);
     uintptr_t aligned_addr_val = (base_addr_val + SEGMENT_SIZE - 1) & ~(SEGMENT_SIZE - 1);
-    
     void* aligned_ptr = reinterpret_cast<void*>(aligned_addr_val);
-    
-    assert(aligned_addr_val >= base_addr_val);
-    assert((aligned_addr_val + SEGMENT_SIZE) <= (base_addr_val + MMAP_BUFFER_SIZE));
 
+    // 3. 裁剪掉头尾多余的部分
     size_t head_trim_size = aligned_addr_val - base_addr_val;
-    size_t tail_trim_size = (base_addr_val + MMAP_BUFFER_SIZE) - (aligned_addr_val + SEGMENT_SIZE);
-
     if (head_trim_size > 0) {
-        munmap(base_ptr, head_trim_size);
+        ::munmap(base_ptr, head_trim_size);
     }
+    
+    size_t tail_trim_size = (base_addr_val + mmap_buffer_size) - (aligned_addr_val + segment_size);
     if (tail_trim_size > 0) {
-        void* tail_start = reinterpret_cast<void*>(aligned_addr_val + SEGMENT_SIZE);
-        munmap(tail_start, tail_trim_size);
+        void* tail_start = reinterpret_cast<void*>(aligned_addr_val + segment_size);
+        ::munmap(tail_start, tail_trim_size);
     }
 
-    return new (aligned_ptr) MappedSegment();
+    // 4. 使用 placement new 构造对象
+    MappedSegment* segment = new (aligned_ptr) MappedSegment();
+
+    // 5. 让 Segment 记住自己的总大小
+    segment->total_size_ = segment_size;
+
+    return segment;
 }
 
-void MappedSegment::destroy(MappedSegment* segment) {
-    if (!segment) {
-        return;
-    }
 
-    segment->~MappedSegment();
-    munmap(segment, SEGMENT_SIZE);
+// ====================================================================
+// ### 更新 destroy() 以处理可变大小 ###
+// ====================================================================
+void MappedSegment::destroy(MappedSegment* segment) {
+    if (segment) {
+        // 从 segment 自身获取需要 munmap 的大小
+        size_t total_size = segment->total_size_;
+        segment->~MappedSegment();
+        ::munmap(segment, total_size);
+    }
 }
 
 
