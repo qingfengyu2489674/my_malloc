@@ -1,6 +1,5 @@
 #include <my_malloc/internal/MappedSegment.hpp>
 
-#include <sys/mman.h>
 #include <new>
 #include <cassert>
 
@@ -32,7 +31,7 @@ MappedSegment* MappedSegment::create(size_t segment_size /* = SEGMENT_SIZE */) {
     // 1. 使用“过量申请再裁剪”技巧来保证 SEGMENT_SIZE 对齐
     const size_t mmap_buffer_size = segment_size + (SEGMENT_SIZE - PAGE_SIZE);
 
-    void* base_ptr = ::mmap(nullptr, mmap_buffer_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    void* base_ptr = mmap(nullptr, mmap_buffer_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (base_ptr == MAP_FAILED) {
         return nullptr;
     }
@@ -45,13 +44,13 @@ MappedSegment* MappedSegment::create(size_t segment_size /* = SEGMENT_SIZE */) {
     // 3. 裁剪掉头尾多余的部分
     size_t head_trim_size = aligned_addr_val - base_addr_val;
     if (head_trim_size > 0) {
-        ::munmap(base_ptr, head_trim_size);
+        munmap(base_ptr, head_trim_size);
     }
     
     size_t tail_trim_size = (base_addr_val + mmap_buffer_size) - (aligned_addr_val + segment_size);
     if (tail_trim_size > 0) {
         void* tail_start = reinterpret_cast<void*>(aligned_addr_val + segment_size);
-        ::munmap(tail_start, tail_trim_size);
+        munmap(tail_start, tail_trim_size);
     }
 
     // 4. 使用 placement new 构造对象

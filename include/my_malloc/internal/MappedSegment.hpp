@@ -7,6 +7,7 @@
 #include <atomic>
 
 #include <my_malloc/internal/definitions.hpp>
+#include <my_malloc/sys/mman.hpp>
 
 namespace my_malloc {
     class ThreadHeap;

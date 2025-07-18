@@ -22,7 +22,8 @@ enum class PageStatus : uint8_t {
     LARGE_SLAB_START,
     LARGE_SLAB_CONT, 
     SMALL_SLAB_START,
-    SMALL_SLAB_CONT
+    SMALL_SLAB_CONT,
+    HUGE_SLAB 
 };
 
 class AllocSlab;

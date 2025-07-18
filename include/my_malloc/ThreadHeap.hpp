@@ -88,6 +88,8 @@ class ThreadHeap {
     // 保护此 Heap 内部状态的互斥锁。
     std::mutex lock_;
 
+    std::mutex huge_segments_lock_;
+
     // --- 跨线程延迟释放队列 ---
     std::atomic<PendingFreeNode*> pending_free_list_head_{nullptr};
     std::atomic<size_t> pending_free_count_{0};
@@ -104,6 +106,7 @@ class ThreadHeap {
     // --- Segment 管理 ---
     internal::MappedSegment* active_segments_{nullptr};
     internal::MappedSegment* free_segments_{nullptr};
+    internal::MappedSegment* huge_segments_{nullptr};
 
     // --- 私有辅助函数 (核心逻辑) ---
 
