@@ -17,6 +17,8 @@ namespace internal {
 class MappedSegment;
 }
 
+class ThreadHeapDestructorTest;
+
 /**
  * @class ThreadHeap
  * @brief 线程私有的内存管理器，是内存分配和释放操作的“大脑”。
@@ -25,7 +27,12 @@ class MappedSegment;
  * ThreadHeap 负责管理 MappedSegment (从OS获取的大块内存) 和 AllocSlab (用于具体分配的单元)。
  */
 class ThreadHeap {
+
+    // 测试用
+    friend class ::my_malloc::ThreadHeapDestructorTest;
+    
 public:
+
     /**
      * @brief 构造函数。初始化所有内部数据结构。
      */
@@ -65,7 +72,7 @@ public:
      */
     void push_pending_free(void* ptr);
 
-private:
+// private:
     // --- 私有内嵌数据结构 ---
 
     // 用于管理特定尺寸 SmallSlab 的容器，本质是一个双向链表头。

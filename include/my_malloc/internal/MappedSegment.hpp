@@ -10,6 +10,7 @@
 
 namespace my_malloc {
     class ThreadHeap;
+    class ThreadHeapDestructorTest;
 }
 
 namespace my_malloc {
@@ -47,6 +48,10 @@ public:
     size_t get_metadata_size_from_descriptor() const;
 
 private:
+
+    // 测试用
+    friend class ::my_malloc::ThreadHeapDestructorTest;
+
     MappedSegment();
     ~MappedSegment();
 
