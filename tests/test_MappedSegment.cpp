@@ -3,6 +3,8 @@
 // 包含被测试的头文件
 #include <my_malloc/internal/MappedSegment.hpp>
 
+using my_malloc::ThreadHeap;
+
 // 使用我们定义的核心常量和类型
 using namespace my_malloc::internal;
 

@@ -6,6 +6,10 @@
 #include <cstdint>
 
 namespace my_malloc {
+    class ThreadHeap;
+}
+
+namespace my_malloc {
 namespace internal {
 
 constexpr size_t PAGE_SIZE = 4 * 1024;
@@ -25,8 +29,6 @@ struct PageDescriptor {
     PageStatus status = PageStatus::FREE;
     AllocSlab* slab_ptr = nullptr;
 };
-
-class ThreadHeap;
 
 } // namespace internal
 } // namespace my_malloc

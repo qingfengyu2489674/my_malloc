@@ -6,6 +6,10 @@
 #include <my_malloc/internal/definitions.hpp>
 
 namespace my_malloc {
+    class ThreadHeap;
+}
+
+namespace my_malloc {
 namespace internal {
 
 // 定义 Small Object 的大小上限。超过此大小的请求将由 Large Object 逻辑处理。

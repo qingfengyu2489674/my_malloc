@@ -9,9 +9,11 @@
 #include <my_malloc/internal/definitions.hpp>
 
 namespace my_malloc {
-namespace internal {
+    class ThreadHeap;
+}
 
-class ThreadHeap;
+namespace my_malloc {
+namespace internal {
 
 /**
  * @class MappedSegment
