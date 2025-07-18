@@ -36,7 +36,7 @@ TEST_F(AllocateTest, AllocateOnePageLargeObject) {
     internal::PageDescriptor* desc = seg->page_descriptor_from_ptr(ptr);
     
     // 3. 验证 PageDescriptor 的状态是否被正确设置
-    EXPECT_EQ(desc->status, internal::PageStatus::SLAB_START);
+    EXPECT_EQ(desc->status, internal::PageStatus::LARGE_SLAB_START);
     EXPECT_EQ(desc->num_pages, 1); // 应该只占用 1 页
     EXPECT_EQ(desc->slab_ptr, ptr);
 }
@@ -56,7 +56,7 @@ TEST_F(AllocateTest, AllocateMultiPageLargeObject) {
     internal::PageDescriptor* start_desc = seg->page_descriptor_from_ptr(ptr);
     
     // 验证起始页的 PageDescriptor
-    EXPECT_EQ(start_desc->status, internal::PageStatus::SLAB_START);
+    EXPECT_EQ(start_desc->status, internal::PageStatus::LARGE_SLAB_START);
     EXPECT_EQ(start_desc->num_pages, 4); // 应该向上取整为 4 页
     EXPECT_EQ(start_desc->slab_ptr, ptr);
 
@@ -64,7 +64,7 @@ TEST_F(AllocateTest, AllocateMultiPageLargeObject) {
     for (int i = 1; i < 4; ++i) {
         char* next_page_ptr = static_cast<char*>(ptr) + i * internal::PAGE_SIZE;
         internal::PageDescriptor* cont_desc = seg->page_descriptor_from_ptr(next_page_ptr);
-        EXPECT_EQ(cont_desc->status, internal::PageStatus::SLAB_SUBPAGE);
+        EXPECT_EQ(cont_desc->status, internal::PageStatus::LARGE_SLAB_CONT);
         EXPECT_EQ(cont_desc->slab_ptr, ptr); // 应该指向 slab 的起始地址
     }
 }

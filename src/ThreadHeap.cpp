@@ -104,9 +104,8 @@ void* ThreadHeap::allocate(size_t size) {
 // ... (rest of the file)
 
 void ThreadHeap::free(void* ptr) {
-    // TODO: 阶段四/五实现
-    // 在最终实现中，它会判断是同线程还是跨线程释放。
-    // 这里暂时留空。
+    // 公共的 free 接口。目前是单线程，所以直接调用内部实现。
+    internal_free(ptr);
 }
 
 void ThreadHeap::push_pending_free(void* ptr) {
@@ -114,7 +113,38 @@ void ThreadHeap::push_pending_free(void* ptr) {
 }
 
 void ThreadHeap::internal_free(void* ptr) {
-    // TODO: 阶段四实现
+    if (ptr == nullptr) {
+        return;
+    }
+
+    // 1. 根据指针找到它所属的 MappedSegment
+    internal::MappedSegment* segment = internal::MappedSegment::from_ptr(ptr);
+
+    // (在这里可以添加一个检查，确保 segment->get_owner_heap() == this)
+
+    // 2. 从 Segment 中找到管理这个指针的 PageDescriptor
+    internal::PageDescriptor* start_desc = segment->page_descriptor_from_ptr(ptr);
+
+    // 3. 检查这是否是一个合法的、已分配的大对象起始地址
+    if (start_desc->status != internal::PageStatus::LARGE_SLAB_START) {
+        // 错误：用户尝试释放一个无效的指针 (不是分配的起始地址，或者是其他类型的内存)
+        // 在生产环境中，这里应该记录错误或使程序崩溃。
+        // assert(false && "Invalid pointer passed to free()");
+        return;
+    }
+
+    // 4. 从描述符中获取它的大小
+    uint16_t num_pages = start_desc->num_pages;
+
+    // 5. 遍历这个 slab 占用的所有页，将它们的 PageDescriptor 状态重置为 FREE
+    for (uint16_t i = 0; i < num_pages; ++i) {
+        char* current_page_ptr = static_cast<char*>(ptr) + i * internal::PAGE_SIZE;
+        internal::PageDescriptor* desc = segment->page_descriptor_from_ptr(current_page_ptr);
+        desc->status = internal::PageStatus::FREE;
+        // (我们暂时不清空 num_pages 和 slab_ptr 字段，保持简单)
+    }
+    
+    // (在这个版本中，我们不做任何内存复用，所以没有对 release_slab 的调用)
 }
 
 void ThreadHeap::process_pending_frees() {
@@ -135,7 +165,7 @@ void* ThreadHeap::acquire_slab(uint16_t num_pages) {
     internal::MappedSegment* current_seg = active_segments_;
     while (current_seg) {
         // 使用你已经实现的、简单的线性分配函数
-        void* slab = current_seg->find_and_allocate_slab(num_pages);
+        void* slab = current_seg->linear_allocate_pages(num_pages, internal::PageStatus::LARGE_SLAB_START, internal::PageStatus::LARGE_SLAB_CONT);
         if (slab != nullptr) {
             // 在现有的 segment 中成功找到了空间，直接返回
             return slab;
@@ -167,7 +197,7 @@ void* ThreadHeap::acquire_slab(uint16_t num_pages) {
     active_segments_ = new_seg;
 
     // 在这个全新的 segment 中进行分配
-    void* slab = new_seg->find_and_allocate_slab(num_pages);
+    void* slab = new_seg->linear_allocate_pages(num_pages, internal::PageStatus::LARGE_SLAB_START, internal::PageStatus::LARGE_SLAB_CONT);
     
     if (slab == nullptr) {
         // 防御性代码：请求的大小对于一个新 segment 也太大了

@@ -17,10 +17,12 @@ constexpr size_t SEGMENT_SIZE = 2 * 1024 * 1024;
 
 enum class PageStatus : uint8_t {
     FREE,
-    SLAB_START,
-    SLAB_SUBPAGE,
     METADATA_START,
-    METADATA_SUBPAGE 
+    METADATA_CONT,
+    LARGE_SLAB_START,
+    LARGE_SLAB_CONT, 
+    SMALL_SLAB_START,
+    SMALL_SLAB_CONT
 };
 
 class AllocSlab;

@@ -122,7 +122,7 @@ TEST_F(MappedSegmentTest, PageDescriptorLookupAndModification) {
     EXPECT_EQ(desc->slab_ptr, nullptr);
 
     // 2. 修改该 descriptor 的内容
-    desc->status = PageStatus::SLAB_START;
+    desc->status = PageStatus::LARGE_SLAB_START;
     AllocSlab* dummy_slab = reinterpret_cast<AllocSlab*>(0xCAFEF00D);
     desc->slab_ptr = dummy_slab;
 
@@ -131,7 +131,7 @@ TEST_F(MappedSegmentTest, PageDescriptorLookupAndModification) {
     PageDescriptor* desc_again = segment_->page_descriptor_from_ptr(another_ptr_in_same_page);
 
     EXPECT_EQ(desc_again, desc) << "Pointers within the same page should return the same descriptor.";
-    EXPECT_EQ(desc_again->status, PageStatus::SLAB_START);
+    EXPECT_EQ(desc_again->status, PageStatus::LARGE_SLAB_START);
     EXPECT_EQ(desc_again->slab_ptr, dummy_slab);
 
     // 4. 检查相邻的 page 是否未受影响，确保修改没有越界
@@ -204,7 +204,7 @@ TEST_F(MappedSegmentTest, ConstructorInitializesMetadataPagesCorrectly) {
         void* ptr_in_page = reinterpret_cast<char*>(segment_) + i * PAGE_SIZE;
         const PageDescriptor* desc_sub = segment_->page_descriptor_from_ptr(ptr_in_page);
         
-        EXPECT_EQ(desc_sub->status, PageStatus::METADATA_SUBPAGE);
+        EXPECT_EQ(desc_sub->status, PageStatus::METADATA_CONT);
     }
 
     // --- 增强部分 ---

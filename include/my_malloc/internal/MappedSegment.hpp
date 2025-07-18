@@ -47,7 +47,7 @@ public:
 
     size_t get_metadata_size_from_descriptor() const;
 
-    void* find_and_allocate_slab(uint16_t num_pages);
+    void* linear_allocate_pages(uint16_t num_pages, PageStatus start_status, PageStatus cont_status);
 
 // private:
 
