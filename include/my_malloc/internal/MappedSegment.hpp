@@ -10,7 +10,7 @@
 
 namespace my_malloc {
     class ThreadHeap;
-    class ThreadHeapDestructorTest;
+    // class ThreadHeapDestructorTest;
 }
 
 namespace my_malloc {
@@ -22,6 +22,13 @@ namespace internal {
  */
 class MappedSegment {
 public:
+
+    // ================== 测试后门 ==================
+#if defined(MY_MALLOC_TESTING)
+    static MappedSegment* create_for_test();
+#endif
+    // ===============================================
+
     struct ListNode {
         MappedSegment* next = nullptr;
         MappedSegment* prev = nullptr;
@@ -50,7 +57,7 @@ public:
 private:
 
     // 测试用
-    friend class ::my_malloc::ThreadHeapDestructorTest;
+    // friend class ::my_malloc::ThreadHeapDestructorTest;
 
     MappedSegment();
     ~MappedSegment();
