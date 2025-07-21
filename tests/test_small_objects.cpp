@@ -55,11 +55,11 @@ TEST_F(SmallObjectTest, AllocateFirstSmallObject) {
     // 验证 Slab 的 class_id 是否正确
     const auto& config = SlabConfig::get_instance();
     size_t expected_class_id = config.get_size_class_index(32);
-    EXPECT_EQ(slab->slab_class_id, expected_class_id) << "Slab 的尺寸类别 ID 不正确";
+    EXPECT_EQ(slab->slab_class_id_, expected_class_id) << "Slab 的尺寸类别 ID 不正确";
 
     // 验证 free_count 是否被正确更新
     const auto& info = config.get_info(expected_class_id);
-    EXPECT_EQ(slab->free_count, info.slab_capacity - 1) << "分配后，Slab 的 free_count 未减少";
+    EXPECT_EQ(slab->free_count_, info.slab_capacity - 1) << "分配后，Slab 的 free_count 未减少";
 }
 
 /**

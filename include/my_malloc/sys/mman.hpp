@@ -23,11 +23,11 @@ extern "C" {
 
 static inline void* mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset) {
     long ret = SYSCALL6(__NR_mmap, addr, length, prot, flags, fd, offset);
-    return (void*)ret;
+    return reinterpret_cast<void*>(ret);
 }
 
 static inline int munmap(void* addr, size_t length) {
-    return (int)SYSCALL2(__NR_munmap, addr, length);
+    return static_cast<int>(SYSCALL2(__NR_munmap, addr, length));
 }
 
 

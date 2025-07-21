@@ -71,17 +71,17 @@ public:
 
 inline MappedSegment* MappedSegment::from_ptr(const void* ptr) {
     return reinterpret_cast<MappedSegment*>(
-        (uintptr_t)ptr & ~(SEGMENT_SIZE - 1)
+        reinterpret_cast<uintptr_t>(ptr) & ~(SEGMENT_SIZE - 1)
     );
 }
 
 inline PageDescriptor* MappedSegment::page_descriptor_from_ptr(const void* ptr) {
-    const size_t page_index = ((uintptr_t)ptr - (uintptr_t)this) / PAGE_SIZE;
+    const size_t page_index = (reinterpret_cast<uintptr_t>(ptr) - reinterpret_cast<uintptr_t>(this)) / PAGE_SIZE;
     return &page_descriptors_[page_index];
 }
 
 inline const PageDescriptor* MappedSegment::page_descriptor_from_ptr(const void* ptr) const {
-    const size_t page_index = ((uintptr_t)ptr - (uintptr_t)this) / PAGE_SIZE;
+    const size_t page_index = (reinterpret_cast<uintptr_t>(ptr) - reinterpret_cast<uintptr_t>(this)) / PAGE_SIZE;
     return &page_descriptors_[page_index];
 }
 

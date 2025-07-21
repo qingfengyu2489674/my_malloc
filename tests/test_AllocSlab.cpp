@@ -61,8 +61,8 @@ TEST_F(AllocSlabTest, InitializationIsCorrect) {
     ASSERT_NE(slab_header_, nullptr);
     ASSERT_NE(slab_info_, nullptr);
 
-    EXPECT_EQ(slab_header_->slab_class_id, TEST_CLASS_ID);
-    EXPECT_EQ(slab_header_->free_count, slab_info_->slab_capacity);
+    EXPECT_EQ(slab_header_->slab_class_id_, TEST_CLASS_ID);
+    EXPECT_EQ(slab_header_->free_count_, slab_info_->slab_capacity);
     EXPECT_FALSE(slab_header_->is_full());
     EXPECT_TRUE(slab_header_->is_empty());
 }
@@ -82,11 +82,11 @@ TEST_F(AllocSlabTest, FullAllocationCycle) {
         EXPECT_TRUE(allocated_pointers.find(block) == allocated_pointers.end()) << "Allocated pointer is not unique.";
         allocated_pointers.insert(block);
 
-        EXPECT_EQ(slab_header_->free_count, capacity - (i + 1));
+        EXPECT_EQ(slab_header_->free_count_, capacity - (i + 1));
     }
 
     EXPECT_TRUE(slab_header_->is_full());
-    EXPECT_EQ(slab_header_->free_count, 0);
+    EXPECT_EQ(slab_header_->free_count_, 0);
 
     void* extra_block = slab_header_->allocate_block();
     EXPECT_EQ(extra_block, nullptr) << "Allocation should fail when slab is full.";
@@ -100,12 +100,12 @@ TEST_F(AllocSlabTest, AllocateAndFreeInterleaved) {
     for (int i = 0; i < 5; ++i) {
         pointers.push_back(slab_header_->allocate_block());
     }
-    ASSERT_EQ(slab_header_->free_count, slab_info_->slab_capacity - 5);
+    ASSERT_EQ(slab_header_->free_count_, slab_info_->slab_capacity - 5);
 
     // 释放时不再需要传入 block_size
     slab_header_->free_block(pointers[1]);
     slab_header_->free_block(pointers[3]);
-    ASSERT_EQ(slab_header_->free_count, slab_info_->slab_capacity - 3);
+    ASSERT_EQ(slab_header_->free_count_, slab_info_->slab_capacity - 3);
 
     void* p6 = slab_header_->allocate_block();
     void* p7 = slab_header_->allocate_block();
@@ -118,7 +118,7 @@ TEST_F(AllocSlabTest, AllocateAndFreeInterleaved) {
     EXPECT_TRUE(p7_reused);
     EXPECT_NE(p6, p7);
 
-    ASSERT_EQ(slab_header_->free_count, slab_info_->slab_capacity - 5);
+    ASSERT_EQ(slab_header_->free_count_, slab_info_->slab_capacity - 5);
 }
 
 // 测试4: 完整生命周期 (分配满 -> 释放空)
@@ -137,11 +137,11 @@ TEST_F(AllocSlabTest, FullLifecycle) {
     for (size_t i = 0; i < capacity; ++i) {
         SCOPED_TRACE("Freeing block " + std::to_string(i + 1));
         slab_header_->free_block(pointers[i]);
-        EXPECT_EQ(slab_header_->free_count, i + 1);
+        EXPECT_EQ(slab_header_->free_count_, i + 1);
     }
 
     ASSERT_TRUE(slab_header_->is_empty());
-    ASSERT_EQ(slab_header_->free_count, capacity);
+    ASSERT_EQ(slab_header_->free_count_, capacity);
 }
 
 // 测试5: 边界和断言检查 (Double-Free)

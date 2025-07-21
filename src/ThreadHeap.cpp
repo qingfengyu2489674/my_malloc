@@ -7,6 +7,7 @@
 #include <cassert>
 #include <new>
 #include <utility>
+#include <cstring>
 
 namespace my_malloc {
 
@@ -78,15 +79,15 @@ void* ThreadHeap::allocate(size_t size) {
         size_t class_id = config.get_size_class_index(size);
         SlabCache& cache = slab_caches_[class_id];
         
-        if (cache.list_head.next != &cache.list_head) {
-            internal::SmallSlabHeader* slab = cache.list_head.next;
+        if (cache.list_head.next_ != &cache.list_head) {
+            internal::SmallSlabHeader* slab = cache.list_head.next_;
             void* ptr = slab->allocate_block();
 
             if (slab->is_full()) {
-                slab->prev->next = slab->next;
-                slab->next->prev = slab->prev;
-                slab->next = nullptr;
-                slab->prev = nullptr;
+                slab->prev_->next_ = slab->next_;
+                slab->next_->prev_ = slab->prev_;
+                slab->next_ = nullptr;
+                slab->prev_ = nullptr;
             }
             
             return ptr;
@@ -97,17 +98,17 @@ void* ThreadHeap::allocate(size_t size) {
             return nullptr; 
         }
 
-        new_slab->next = cache.list_head.next;
-        new_slab->prev = &cache.list_head;
-        cache.list_head.next->prev = new_slab;
-        cache.list_head.next = new_slab;
+        new_slab->next_ = cache.list_head.next_;
+        new_slab->prev_ = &cache.list_head;
+        cache.list_head.next_->prev_ = new_slab;
+        cache.list_head.next_ = new_slab;
 
         void* ptr = new_slab->allocate_block();
         if (new_slab->is_full()) {
-            new_slab->prev->next = new_slab->next;
-            new_slab->next->prev = new_slab->prev;
-            new_slab->next = nullptr;
-            new_slab->prev = nullptr;
+            new_slab->prev_->next_ = new_slab->next_;
+            new_slab->next_->prev_ = new_slab->prev_;
+            new_slab->next_ = nullptr;
+            new_slab->prev_ = nullptr;
         }
         return ptr;
     }
@@ -164,21 +165,21 @@ void ThreadHeap::slab_free(void* ptr) {
 
             if (slab->is_empty()) {
 
-                slab->prev->next = slab->next;
-                slab->next->prev = slab->prev;
+                slab->prev_->next_ = slab->next_;
+                slab->next_->prev_ = slab->prev_;
                 const auto& config = internal::SlabConfig::get_instance();
-                const auto& info = config.get_info(slab->slab_class_id);
+                const auto& info = config.get_info(slab->slab_class_id_);
                 release_slab(slab, info.slab_pages);
             } 
 
             else if (was_full) {
-                size_t class_id = slab->slab_class_id;
+                size_t class_id = slab->slab_class_id_;
                 SlabCache& cache = slab_caches_[class_id];
 
-                slab->next = cache.list_head.next;
-                slab->prev = &cache.list_head;
-                cache.list_head.next->prev = slab;
-                cache.list_head.next = slab;
+                slab->next_ = cache.list_head.next_;
+                slab->prev_ = &cache.list_head;
+                cache.list_head.next_->prev_ = slab;
+                cache.list_head.next_ = slab;
             }
             break;
         }
@@ -255,6 +256,16 @@ void* ThreadHeap::acquire_pages(uint16_t num_pages) {
         return nullptr;
     }
 
+    size_t list_idx = num_pages - 1;
+    if (free_slabs_[list_idx] != nullptr) {
+    
+        internal::FreeSlabNode* node_to_reuse = free_slabs_[list_idx];
+        
+        free_slabs_[list_idx] = node_to_reuse->next_;
+        
+        return node_to_reuse;
+    }
+
     internal::MappedSegment* current_seg = active_segments_;
     while (current_seg) {
         void* pages = current_seg->linear_allocate_pages(num_pages); 
@@ -291,8 +302,17 @@ void ThreadHeap::release_slab(void* slab_ptr, uint16_t num_pages) {
         char* current_page_ptr = static_cast<char*>(slab_ptr) + i * internal::PAGE_SIZE;
         internal::PageDescriptor* desc = segment->page_descriptor_from_ptr(current_page_ptr);
         desc->status = internal::PageStatus::FREE;
-        // 在后续阶段，这里还需要清空 desc->slab_ptr 和 desc->num_pages
     }
+
+    memset(slab_ptr, 0, sizeof(internal::FreeSlabNode));
+
+    auto* node = new (slab_ptr) internal::FreeSlabNode();
+
+    node->num_pages_ = num_pages;
+    
+    size_t list_idx = num_pages - 1;
+    node->next_ = free_slabs_[list_idx];
+    free_slabs_[list_idx] = node;
 }
 
 } // namespace my_malloc

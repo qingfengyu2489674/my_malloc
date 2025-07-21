@@ -8,26 +8,26 @@ namespace my_malloc {
 namespace internal {
 
 struct FreeSlabNode {
-    FreeSlabNode* prev = nullptr;
-    FreeSlabNode* next = nullptr;
-    uint16_t num_pages = 0;
-    uint16_t reserved = 0; 
+    // FreeSlabNode* prev = nullptr; // 由于单项链表
+    FreeSlabNode* next_ = nullptr;
+    uint16_t num_pages_ = 0;
+    uint16_t reserved_ = 0; 
 };
 static_assert(sizeof(FreeSlabNode) <= 32, "FreeSlabNode is too large!");
 
 
 class SmallSlabHeader {
 public:
-    SmallSlabHeader* prev = nullptr;
-    SmallSlabHeader* next = nullptr;
+    SmallSlabHeader* prev_ = nullptr;
+    SmallSlabHeader* next_ = nullptr;
     
-    uint16_t free_count = 0;
-    uint16_t slab_class_id = 0;
+    uint16_t free_count_ = 0;
+    uint16_t slab_class_id_ = 0;
 
     uint64_t bitmap[1];
 
     SmallSlabHeader() 
-        : prev(this), next(this), free_count(0), slab_class_id(UINT16_MAX) 
+        : prev_(this), next_(this), free_count_(0), slab_class_id_(UINT16_MAX) 
     {}
 
     explicit SmallSlabHeader(uint16_t slab_class_id);
@@ -39,7 +39,7 @@ public:
 
     void free_block(void* ptr);
 
-    bool is_full() const { return free_count == 0; }
+    bool is_full() const { return free_count_ == 0; }
 
     bool is_empty() const;
 };

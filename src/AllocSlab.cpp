@@ -11,12 +11,12 @@ namespace my_malloc {
 namespace internal {
 
 SmallSlabHeader::SmallSlabHeader(uint16_t slab_class_id) {
-    this->slab_class_id = slab_class_id;
+    this->slab_class_id_ = slab_class_id;
 
     const SlabConfig& config = SlabConfig::get_instance();
     const SlabConfigInfo& info = config.get_info(slab_class_id);
 
-    this->free_count = info.slab_capacity;
+    this->free_count_ = info.slab_capacity;
 
     // 初始化位图 (bitmap)，将所有位设为 1，表示所有块都空闲
     size_t bitmap_uint64_count = (info.slab_capacity + 63) / 64;
@@ -31,8 +31,8 @@ SmallSlabHeader::SmallSlabHeader(uint16_t slab_class_id) {
     }
 
     // 初始化链表指针，表示暂不属于任何链表
-    this->prev = nullptr;
-    this->next = nullptr;
+    this->prev_ = nullptr;
+    this->next_ = nullptr;
 }
 
 void* SmallSlabHeader::allocate_block() {
@@ -41,7 +41,7 @@ void* SmallSlabHeader::allocate_block() {
     }
 
     const SlabConfig& config = SlabConfig::get_instance();
-    const SlabConfigInfo& info = config.get_info(this->slab_class_id);
+    const SlabConfigInfo& info = config.get_info(this->slab_class_id_);
 
     size_t bitmap_uint64_count = (info.slab_capacity + 63) / 64;
     size_t block_index = 0;
@@ -76,7 +76,7 @@ void* SmallSlabHeader::allocate_block() {
 
         // 标记该位为 0 (已使用)
         this->bitmap[i] &= ~(1ULL << bit_index);
-        this->free_count--;
+        this->free_count_--;
 
         // 计算并返回用户块的指针
         char* start_of_blocks = reinterpret_cast<char*>(this) + info.slab_metadata_size;
@@ -89,7 +89,7 @@ void* SmallSlabHeader::allocate_block() {
 
 void SmallSlabHeader::free_block(void* ptr) {
     const SlabConfig& config = SlabConfig::get_instance();
-    const SlabConfigInfo& info = config.get_info(this->slab_class_id);
+    const SlabConfigInfo& info = config.get_info(this->slab_class_id_);
 
     // 计算 ptr 相对于数据区的偏移，反推出 block_index
     char* start_of_blocks = reinterpret_cast<char*>(this) + info.slab_metadata_size;
@@ -109,14 +109,14 @@ void SmallSlabHeader::free_block(void* ptr) {
 
     // 标记该位为 1 (空闲)
     this->bitmap[word_index] |= (1ULL << bit_index);
-    this->free_count++;
+    this->free_count_++;
 }
 
 bool SmallSlabHeader::is_empty() const {
     const SlabConfig& config = SlabConfig::get_instance();
-    const SlabConfigInfo& info = config.get_info(this->slab_class_id);
+    const SlabConfigInfo& info = config.get_info(this->slab_class_id_);
 
-    return this->free_count == info.slab_capacity;
+    return this->free_count_ == info.slab_capacity;
 }
 
 } // namespace internal
