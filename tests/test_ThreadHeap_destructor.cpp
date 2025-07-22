@@ -27,7 +27,6 @@ protected:
         // 在析构 heap_ 之前，清空它内部的指针，
         // 防止 ~ThreadHeap 对我们手动管理的内存调用 munmap。
         heap_->active_segments_ = nullptr;
-        heap_->free_segments_ = nullptr;
         delete heap_;
 
         // 安全地释放我们为测试分配的裸内存。
@@ -114,7 +113,6 @@ TEST_F(RealDestructorTest, DestructorCleansUpAllSegments) {
         for (size_t i = 0; i < active_segs.size() - 1; ++i) active_segs[i]->list_node.next = active_segs[i+1];
     }
     if (!free_segs.empty()) {
-        heap->free_segments_ = free_segs.front();
         for (size_t i = 0; i < free_segs.size() - 1; ++i) free_segs[i]->list_node.next = free_segs[i+1];
     }
     

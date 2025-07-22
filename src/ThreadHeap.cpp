@@ -33,9 +33,6 @@ ThreadHeap::~ThreadHeap() {
     destroy_segment_list(active_segments_);
     active_segments_ = nullptr;
 
-    destroy_segment_list(free_segments_);
-    free_segments_ = nullptr;
-
     destroy_segment_list(huge_segments_);
     huge_segments_ = nullptr;
 }
@@ -64,7 +61,7 @@ void* ThreadHeap::allocate(size_t size) {
         desc->status = internal::PageStatus::HUGE_SLAB;
 
         {   
-            std::lock_guard<std::mutex> guard(huge_segments_lock_);
+            std::lock_guard<std::mutex> guard(lock_);
                     
             huge_seg->list_node.next = huge_segments_;
             huge_seg->list_node.prev = nullptr;
@@ -81,7 +78,7 @@ void* ThreadHeap::allocate(size_t size) {
     else if (size > internal::MAX_SMALL_OBJECT_SIZE){ 
         const size_t total_size = size + sizeof(internal::LargeSlabHeader);
         const size_t num_pages = (total_size + internal::PAGE_SIZE - 1) / internal::PAGE_SIZE;
-        void* ptr = acquire_large_slab(static_cast<uint16_t>(num_pages));
+        void* ptr = allocate_large_slab(static_cast<uint16_t>(num_pages));
         return ptr;
     }
     else {
@@ -136,7 +133,7 @@ void ThreadHeap::free(void* ptr) {
     if (segment->page_descriptors_[0].status == internal::PageStatus::HUGE_SLAB) {
 
         {
-            std::lock_guard<std::mutex> guard(huge_segments_lock_);
+            std::lock_guard<std::mutex> guard(lock_);
 
             MappedSegment* prev_node = segment->list_node.prev;
             MappedSegment* next_node = segment->list_node.next;
@@ -215,7 +212,7 @@ void ThreadHeap::push_pending_free(void* /*ptr*/) {
 void ThreadHeap::process_pending_frees() {
 }
 
-void* ThreadHeap::acquire_large_slab(uint16_t num_pages) {
+void* ThreadHeap::allocate_large_slab(uint16_t num_pages) {
     void* header_ptr = acquire_pages(num_pages);
     if (header_ptr == nullptr) {
         return nullptr;

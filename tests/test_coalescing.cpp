@@ -91,7 +91,6 @@ TEST_F(CoalescingTest, CoalesceWithNextBlock) {
     
     uint16_t pages_a = heap_->get_slab_pages(user_ptr_a);
     uint16_t pages_b = heap_->get_slab_pages(user_ptr_b);
-    uint16_t pages_c = heap_->get_slab_pages(user_ptr_c);
     
     heap_->free(user_ptr_c);
 
@@ -200,7 +199,6 @@ TEST_F(CoalescingTest, CoalesceWithBothNeighbors) {
     expect_freelist_is_empty(pages_c);
 
     // b. 应该出现一个合并了三者大小的新空闲块
-    uint16_t merged_pages = pages_a + pages_b + pages_c;
     internal::LargeSlabHeader* merged_slab = heap_->get_freelist_head(509);
     ASSERT_NE(merged_slab, nullptr) << "Blocks A, B, and C were not merged correctly.";
     
