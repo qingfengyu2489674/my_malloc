@@ -99,9 +99,9 @@ class ThreadHeap {
     SlabCache slab_caches_[internal::MAX_NUM_SIZE_CLASSES];
 
     // --- Large 对象及空闲空间管理 ---
-    // 一个 FreeSlabNode 链表数组，按下标（代表页数-1）索引。
+    // 一个 LargeSlabHeader 链表数组，按下标（代表页数-1）索引。
     // a[i] 链接着所有大小为 (i+1) 页的空闲 Slab。
-    internal::FreeSlabNode* free_slabs_[internal::SEGMENT_SIZE / internal::PAGE_SIZE]{};
+    internal::LargeSlabHeader* free_slabs_[internal::SEGMENT_SIZE / internal::PAGE_SIZE]{};
 
     // --- Segment 管理 ---
     internal::MappedSegment* active_segments_{nullptr};
@@ -109,13 +109,6 @@ class ThreadHeap {
     internal::MappedSegment* huge_segments_{nullptr};
 
     // --- 私有辅助函数 (核心逻辑) ---
-
-    /**
-     * @brief [实现] 内部的、非线程安全的释放逻辑。
-     * 假定调用者已经获取了锁。
-     * @param ptr 待释放的指针。
-     */
-    void slab_free(void* ptr);
 
     /**
      * @brief 处理积压的跨线程释放请求。
@@ -129,6 +122,10 @@ class ThreadHeap {
 
     void* acquire_pages(uint16_t num_pages);
 
+    internal::LargeSlabHeader* initialize_as_free_slab(void* slab_ptr, uint16_t num_pages);
+
+    void* split_slab(internal::LargeSlabHeader* slab_to_split, uint16_t required_pages);
+
     /**
      * @brief 资源回收的核心：将一块完全空闲的 Slab 归还到系统中。
      */
@@ -138,6 +135,10 @@ class ThreadHeap {
      * @brief 为 Small 对象分配一个新的、初始化的 Slab。
      */
     internal::SmallSlabHeader* allocate_small_slab(size_t class_id);
+
+    void prepend_to_freelist(internal::LargeSlabHeader* node_to_add);
+
+    void remove_from_freelist(internal::LargeSlabHeader* node_to_remove);
 };
 
 } // namespace my_malloc

@@ -1,159 +1,120 @@
-// file: tests/test_acquire_slab.cpp
-
 #include <gtest/gtest.h>
-#include <my_malloc/ThreadHeap.hpp>
-#include <my_malloc/internal/MappedSegment.hpp>
-#include <my_malloc/internal/definitions.hpp>
+#include "my_malloc/ThreadHeap.hpp"
+#include "my_malloc/internal/MappedSegment.hpp"
+#include "my_malloc/internal/definitions.hpp"
 
-#include <vector>
-#include <cstdint>
-#include <cstdlib> // 为了 posix_memalign 和 free
-
-namespace my_malloc {
-
-// 测试 acquire_large_slab 的功能
-class AcquireSlabTest : public ::testing::Test {
-protected:
-    ThreadHeap* heap_ = nullptr;
-    // 用于跟踪我们为测试手动创建的 Segment 的内存，
-    // 以便在测试结束后进行清理。
-    std::vector<void*> raw_segment_memory_to_free_; 
-
-    void SetUp() override {
-        heap_ = new ThreadHeap();
-    }
-
-    void TearDown() override {
-        // 在析构 heap_ 之前，必须将它内部指向我们手动创建的内存的指针清空，
-        // 否则 ~ThreadHeap 会尝试对这些内存调用 MappedSegment::destroy (即 munmap)，
-        // 而这些内存是用 posix_memalign 分配的，会导致程序崩溃。
-        heap_->active_segments_ = nullptr; 
-        heap_->free_segments_ = nullptr;
-        delete heap_;
-
-        // 现在可以安全地释放我们为测试分配的裸内存了。
-        for (void* mem : raw_segment_memory_to_free_) {
-            ::free(mem);
-        }
-        raw_segment_memory_to_free_.clear();
+// 使我们能够访问 ThreadHeap 的私有成员进行测试
+class ThreadHeapFriend : public my_malloc::ThreadHeap {
+public:
+    // 暴露 acquire_pages 以便直接测试
+    void* test_acquire_pages(uint16_t num_pages) {
+        return acquire_pages(num_pages);
     }
     
-    // 手动创建一个对齐的 MappedSegment，以精确模拟 MappedSegment::create() 的行为。
-    internal::MappedSegment* create_aligned_segment_for_test() {
-        void* mem = nullptr;
-        // 使用 posix_memalign 获取对齐内存，这对于 MappedSegment::from_ptr 至关重要。
-        if (::posix_memalign(&mem, internal::SEGMENT_SIZE, sizeof(internal::MappedSegment)) != 0) {
-            return nullptr;
-        }
-        
-        // 使用 placement new 直接调用 public 构造函数。
-        internal::MappedSegment* seg = new (mem) internal::MappedSegment();
-        
-        // 手动进行必要的初始化
-        seg->set_owner_heap(heap_);
-        // 标记所有页为 FREE，这是 MappedSegment::create() 应该做的
-        for (size_t i = 0; i < (internal::SEGMENT_SIZE / internal::PAGE_SIZE); ++i) {
-            seg->page_descriptors_[i].status = internal::PageStatus::FREE;
-        }
-        
-        // 跟踪这块内存，以便在 TearDown 中释放
-        raw_segment_memory_to_free_.push_back(mem);
-        return seg;
+    // 暴露内部状态以便验证
+    my_malloc::internal::MappedSegment* get_active_segments() {
+        return active_segments_;
+    }
+
+    my_malloc::internal::LargeSlabHeader** get_free_slabs() {
+        return free_slabs_;
     }
 };
 
-// ===================================================================================
-// 测试用例 1: 从一个空的 Heap 中获取 Slab
-// ===================================================================================
+class AcquireSlabTest : public ::testing::Test {
+protected:
+    ThreadHeapFriend* heap_ = nullptr;
+
+    void SetUp() override {
+        heap_ = new ThreadHeapFriend();
+    }
+
+    void TearDown() override {
+        delete heap_;
+    }
+};
+
+using namespace my_malloc;
+
+// 测试1：当堆为空时，分配会创建一个新的Segment
 TEST_F(AcquireSlabTest, FromNewSegmentWhenHeapIsEmpty) {
-    // 初始时 active_segments_ 应该为 null
-    ASSERT_EQ(heap_->active_segments_, nullptr);
-    
-    void* slab = heap_->acquire_large_slab(1);
+    ASSERT_EQ(heap_->get_active_segments(), nullptr);
+
+    void* slab = heap_->test_acquire_pages(1);
     ASSERT_NE(slab, nullptr);
 
-    // 验证 heap 的 active_segments_ 链表现在有了一个节点
-    ASSERT_NE(heap_->active_segments_, nullptr);
-    EXPECT_EQ(heap_->active_segments_->list_node.next, nullptr);
-
-    // 验证 slab 确实来自这个新的 segment
-    EXPECT_EQ(internal::MappedSegment::from_ptr(slab), heap_->active_segments_);
+    internal::MappedSegment* seg = heap_->get_active_segments();
+    ASSERT_NE(seg, nullptr);
+    EXPECT_EQ(internal::MappedSegment::from_ptr(slab), seg);
+    EXPECT_EQ(seg->list_node.next, nullptr);
 }
 
-// ===================================================================================
-// 测试用例 2: 从一个已存在且有足够空间的 Active Segment 中获取 Slab
-// ===================================================================================
-TEST_F(AcquireSlabTest, FromExistingActiveSegmentWithSpace) {
-    // 设置: 创建一个 segment，并手动将其设为 heap 的 active segment。
-    internal::MappedSegment* seg1 = create_aligned_segment_for_test();
-    // 直接访问和修改 public 成员
-    heap_->active_segments_ = seg1;
-    
-    // 操作1: 请求 10 页内存。
-    void* slab1 = heap_->acquire_large_slab(10);
+
+// 测试2：从现有的、有空间的 active segment 中分配 (此测试逻辑需重大修正)
+TEST_F(AcquireSlabTest, ReuseSlabFromFreeList) {
+    // 步骤 1: 创建第一个 segment (seg1) 并从中分配一个 slab (slab1)
+    void* slab1 = heap_->test_acquire_pages(10);
     ASSERT_NE(slab1, nullptr);
-    EXPECT_EQ(internal::MappedSegment::from_ptr(slab1), seg1);
+    internal::MappedSegment* seg1 = heap_->get_active_segments();
+    ASSERT_EQ(internal::MappedSegment::from_ptr(slab1), seg1);
 
-    // 操作2: 再次请求 20 页内存。
-    void* slab2 = heap_->acquire_large_slab(20);
+    // 步骤 2: 释放 slab1，它现在应该进入 free_slabs_ 列表
+    heap_->release_slab(slab1, 10);
+    ASSERT_NE(heap_->get_free_slabs()[9], nullptr) << "Slab should be in the free list after release.";
+
+    // 步骤 3: 再次请求同样大小的 slab，它应该从 free_slabs_ 中被重用
+    void* slab2 = heap_->test_acquire_pages(10);
     ASSERT_NE(slab2, nullptr);
-    EXPECT_EQ(internal::MappedSegment::from_ptr(slab2), seg1);
 
-    // 验证: 没有创建新的 segment
-    EXPECT_EQ(heap_->active_segments_, seg1);
-    EXPECT_EQ(heap_->active_segments_->list_node.next, nullptr);
+    // 验证: 重用的 slab (slab2) 就是我们之前释放的那个 (slab1)
+    EXPECT_EQ(slab2, slab1);
+    
+    // 验证: 因为是从 free_slabs_ 重用的，所以 active_segments_ 链表不应该有任何变化
+    EXPECT_EQ(heap_->get_active_segments(), seg1);
+
+    // 验证: free_slabs_ 中对应的链表现在应该是空的
+    EXPECT_EQ(heap_->get_free_slabs()[9], nullptr);
 }
 
-// ===================================================================================
-// 测试用例 3: 当唯一的 Active Segment 满了之后，会自动创建并使用新的 Segment
-// ===================================================================================
+
+// 测试3: 当 active segment 已满时，回退到创建新 segment
 TEST_F(AcquireSlabTest, FallbackToNewSegmentWhenActiveIsFull) {
-    internal::MappedSegment* seg1 = create_aligned_segment_for_test();
-    heap_->active_segments_ = seg1;
-
-    // 操作1: 耗尽 seg1 的所有可用空间。
-    const size_t total_pages = internal::SEGMENT_SIZE / internal::PAGE_SIZE;
+    // 步骤 1: 填满第一个 segment
     const size_t metadata_pages = (sizeof(internal::MappedSegment) + internal::PAGE_SIZE - 1) / internal::PAGE_SIZE;
-    const uint16_t available_pages = total_pages - metadata_pages;
+    const size_t available_pages = (internal::SEGMENT_SIZE / internal::PAGE_SIZE) - metadata_pages;
     
-    void* slab1 = heap_->acquire_large_slab(available_pages);
+    void* slab1 = heap_->test_acquire_pages(available_pages);
     ASSERT_NE(slab1, nullptr);
-    EXPECT_EQ(internal::MappedSegment::from_ptr(slab1), seg1);
-    
-    // 操作2: 再次请求 1 页。此时 seg1 应该返回 nullptr，迫使 acquire_large_slab 创建新 segment。
-    void* slab2 = heap_->acquire_large_slab(1);
-    ASSERT_NE(slab2, nullptr);
+    internal::MappedSegment* seg1 = heap_->get_active_segments();
+    ASSERT_EQ(internal::MappedSegment::from_ptr(slab1), seg1);
 
-    // 验证: 新的 slab2 应该来自一个新的 segment (seg2)，并且这个新 segment 现在是链表头。
-    internal::MappedSegment* seg2 = internal::MappedSegment::from_ptr(slab2);
-    EXPECT_NE(seg2, seg1);
-    ASSERT_NE(heap_->active_segments_, nullptr);
-    EXPECT_EQ(heap_->active_segments_, seg2);      // seg2 应该是新的链表头
-    EXPECT_EQ(seg2->list_node.next, seg1); // seg1 应该是链表的第二个节点
+    // 步骤 2: 再次请求，即使只有一页，也应该触发创建新 segment (seg2)
+    void* slab2 = heap_->test_acquire_pages(1);
+    ASSERT_NE(slab2, nullptr);
+    
+    internal::MappedSegment* seg2 = heap_->get_active_segments();
+    ASSERT_NE(seg2, nullptr);
+    
+    // 验证: 新的 slab (slab2) 来自新的 segment (seg2)
+    EXPECT_NE(seg1, seg2);
+    EXPECT_EQ(internal::MappedSegment::from_ptr(slab2), seg2);
+
+    // 验证: 新的 segment (seg2) 现在是 active list 的头部，它的 next 指向旧的 (seg1)
+    EXPECT_EQ(seg2, heap_->get_active_segments());
+    EXPECT_EQ(seg2->list_node.next, seg1);
 }
 
-
-
-// 测试用例 4 & 5: 边界条件测试
-// ===================================================================================
-// 验证的逻辑: `acquire_large_slab` 和 `find_and_allocate_slab` 的参数检查和空间计算
+// 测试4: 请求的 slab 大于整个 segment 的可用空间
 TEST_F(AcquireSlabTest, RequestSlabLargerThanSegment) {
-    const uint16_t too_large_pages = (internal::SEGMENT_SIZE / internal::PAGE_SIZE) + 1;
-    void* slab = heap_->acquire_large_slab(too_large_pages);
+    void* slab = heap_->test_acquire_pages(internal::SEGMENT_SIZE / internal::PAGE_SIZE + 1);
     EXPECT_EQ(slab, nullptr);
 }
 
+// 测试5: 请求的 slab 对于一个全新的 segment 来说略大
 TEST_F(AcquireSlabTest, RequestSlabSlightlyTooLargeForNewSegment) {
     const size_t metadata_pages = (sizeof(internal::MappedSegment) + internal::PAGE_SIZE - 1) / internal::PAGE_SIZE;
-    const uint16_t max_possible_pages = (internal::SEGMENT_SIZE / internal::PAGE_SIZE) - metadata_pages;
-    
-    // 请求一个比最大可能值多一页的 slab，应该失败
-    void* slab = heap_->acquire_large_slab(max_possible_pages + 1);
-    EXPECT_EQ(slab, nullptr);
-    
-    // 请求一个正好是最大可能值的 slab，应该成功
-    void* slab2 = heap_->acquire_large_slab(max_possible_pages);
-    EXPECT_NE(slab2, nullptr);
-}
+    const size_t available_pages = (internal::SEGMENT_SIZE / internal::PAGE_SIZE) - metadata_pages;
 
+    void* slab = heap_->test_acquire_pages(available_pages + 1);
+    EXPECT_EQ(slab, nullptr);
 }

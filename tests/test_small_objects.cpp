@@ -44,8 +44,8 @@ TEST_F(SmallObjectTest, AllocateFirstSmallObject) {
     MappedSegment* segment = MappedSegment::from_ptr(ptr);
     PageDescriptor* desc = segment->page_descriptor_from_ptr(ptr);
     
-    // 页面状态应为 SMALL_SLAB_START 或 SMALL_SLAB_CONT
-    ASSERT_TRUE(desc->status == PageStatus::SMALL_SLAB_START || desc->status == PageStatus::SMALL_SLAB_CONT)
+    // 页面状态应为 SMALL_SLAB 或 SMALL_SLAB
+    ASSERT_TRUE(desc->status == PageStatus::SMALL_SLAB || desc->status == PageStatus::SMALL_SLAB)
         << "页面状态未被正确设置为 Small Slab";
 
     // 3. 验证 Slab Header
@@ -269,7 +269,7 @@ TEST_F(SmallObjectTest, BoundarySizeAllocations) {
     void* ptr_small_max = heap->allocate(MAX_SMALL_OBJECT_SIZE);
     ASSERT_NE(ptr_small_max, nullptr);
     PageDescriptor* desc_small = MappedSegment::from_ptr(ptr_small_max)->page_descriptor_from_ptr(ptr_small_max);
-    EXPECT_TRUE(desc_small->status == PageStatus::SMALL_SLAB_START || desc_small->status == PageStatus::SMALL_SLAB_CONT)
+    EXPECT_TRUE(desc_small->status == PageStatus::SMALL_SLAB || desc_small->status == PageStatus::SMALL_SLAB)
         << "分配 MAX_SMALL_OBJECT_SIZE 时未走小对象路径";
     heap->free(ptr_small_max);
 
@@ -277,7 +277,7 @@ TEST_F(SmallObjectTest, BoundarySizeAllocations) {
     void* ptr_large_min = heap->allocate(MAX_SMALL_OBJECT_SIZE + 1);
     ASSERT_NE(ptr_large_min, nullptr);
     PageDescriptor* desc_large = MappedSegment::from_ptr(ptr_large_min)->page_descriptor_from_ptr(ptr_large_min);
-    EXPECT_EQ(desc_large->status, PageStatus::LARGE_SLAB_START)
+    EXPECT_EQ(desc_large->status, PageStatus::LARGE_SLAB)
         << "分配 MAX_SMALL_OBJECT_SIZE + 1 时未走大对象路径";
     heap->free(ptr_large_min);
 }

@@ -24,13 +24,12 @@ if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_CLANG)
         -Wall                   # 开启大部分警告
         -Wextra                 # 开启额外的警告
         -Wpedantic              # 遵循严格的 ISO C++ 标准
-        -Wshadow                # 警告变量名遮蔽
+        -Wno-pedantic           # 禁用关于非标准语法扩展的警告 (针对语句表达式)
         -Wnon-virtual-dtor      # 警告基类缺少虚析构函数
         -Wold-style-cast        # 警告 C 风格的类型转换
         -Wcast-align            # 警告可能导致对齐问题的指针转换
         -Wunused                # 警告未使用的变量/参数
         -Woverloaded-virtual    # 警告派生类中的虚函数重载
-        -Werror=implicit-function-declaration # 将隐式函数声明视为错误
     )
 endif()
 

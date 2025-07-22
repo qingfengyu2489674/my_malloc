@@ -7,13 +7,14 @@
 namespace my_malloc {
 namespace internal {
 
-struct FreeSlabNode {
-    // FreeSlabNode* prev = nullptr; // 由于单项链表
-    FreeSlabNode* next_ = nullptr;
+struct LargeSlabHeader {
+    LargeSlabHeader* prev = nullptr;
+    LargeSlabHeader* next_ = nullptr;
     uint16_t num_pages_ = 0;
     uint16_t reserved_ = 0; 
 };
-static_assert(sizeof(FreeSlabNode) <= 32, "FreeSlabNode is too large!");
+
+static_assert(sizeof(LargeSlabHeader) <= 32, "LargeSlabHeader is too large!");
 
 
 class SmallSlabHeader {

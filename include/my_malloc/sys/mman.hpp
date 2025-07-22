@@ -18,7 +18,7 @@ extern "C" {
 #define MAP_PRIVATE     0x02
 #define MAP_ANONYMOUS   0x20
 #define MAP_ANON        MAP_ANONYMOUS
-#define MAP_FAILED      ((void *) -1)
+#define MAP_FAILED      (reinterpret_cast<void*>(-1))
 
 
 static inline void* mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset) {

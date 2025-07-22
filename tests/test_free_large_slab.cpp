@@ -29,7 +29,7 @@ TEST_F(FreeTest, FreeSinglePageLargeObjectResetsStatus) {
 
     internal::MappedSegment* seg = internal::MappedSegment::from_ptr(ptr);
     internal::PageDescriptor* desc_before = seg->page_descriptor_from_ptr(ptr);
-    ASSERT_EQ(desc_before->status, internal::PageStatus::LARGE_SLAB_START);
+    ASSERT_EQ(desc_before->status, internal::PageStatus::LARGE_SLAB);
 
     heap_->free(ptr);
 
@@ -80,12 +80,12 @@ TEST_F(FreeTest, FreeInvalidPointerDoesNothing) {
     
     internal::MappedSegment* seg = internal::MappedSegment::from_ptr(ptr);
     internal::PageDescriptor* desc_before = seg->page_descriptor_from_ptr(invalid_ptr);
-    ASSERT_EQ(desc_before->status, internal::PageStatus::LARGE_SLAB_CONT);
+    ASSERT_EQ(desc_before->status, internal::PageStatus::LARGE_SLAB);
 
     heap_->free(invalid_ptr);
 
     internal::PageDescriptor* desc_after = seg->page_descriptor_from_ptr(invalid_ptr);
-    EXPECT_EQ(desc_after->status, internal::PageStatus::LARGE_SLAB_CONT);
+    EXPECT_EQ(desc_after->status, internal::PageStatus::LARGE_SLAB);
 }
 
 } // namespace my_malloc

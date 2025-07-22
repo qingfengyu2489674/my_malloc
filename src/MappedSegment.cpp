@@ -13,13 +13,12 @@ MappedSegment::MappedSegment() : owner_heap_(nullptr) {
     const size_t metadata_size = sizeof(MappedSegment);
     const size_t num_metadata_pages = (metadata_size + PAGE_SIZE - 1) / PAGE_SIZE;
 
-    page_descriptors_[0].status = PageStatus::METADATA_START;
-
-    // !! 警告 !!：这个指针绝对不能被解引用（dereference）。它只是一个存储整数的容器。
-    page_descriptors_[0].slab_ptr = reinterpret_cast<AllocSlab*>(metadata_size);
+    page_descriptors_[0].status = PageStatus::METADATA;
+    page_descriptors_[0].slab_ptr = this;
 
     for (size_t i = 1; i < num_metadata_pages; ++i) {
-        page_descriptors_[i].status = PageStatus::METADATA_CONT;
+        page_descriptors_[i].status = PageStatus::METADATA;
+        page_descriptors_[i].slab_ptr = this;
     }
 }
 
@@ -99,9 +98,9 @@ void* MappedSegment::linear_allocate_pages(uint16_t num_pages) {
         const size_t metadata_pages = (sizeof(MappedSegment) + PAGE_SIZE - 1) / PAGE_SIZE;
 
         // 标记元数据页。这是 MappedSegment 的内部事务。
-        page_descriptors_[0].status = PageStatus::METADATA_START;
+        page_descriptors_[0].status = PageStatus::METADATA;
         for (size_t i = 1; i < metadata_pages; ++i) {
-            page_descriptors_[i].status = PageStatus::METADATA_CONT;
+            page_descriptors_[i].status = PageStatus::METADATA;
         }
         
         // 将“水位线”移过元数据区域。

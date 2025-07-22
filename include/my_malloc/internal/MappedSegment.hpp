@@ -46,8 +46,6 @@ public:
     PageDescriptor* page_descriptor_from_ptr(const void* ptr);
     const PageDescriptor* page_descriptor_from_ptr(const void* ptr) const;
 
-    size_t get_metadata_size_from_descriptor() const;
-
     void* linear_allocate_pages(uint16_t num_pages);
 
 // private:
@@ -83,13 +81,6 @@ inline PageDescriptor* MappedSegment::page_descriptor_from_ptr(const void* ptr) 
 inline const PageDescriptor* MappedSegment::page_descriptor_from_ptr(const void* ptr) const {
     const size_t page_index = (reinterpret_cast<uintptr_t>(ptr) - reinterpret_cast<uintptr_t>(this)) / PAGE_SIZE;
     return &page_descriptors_[page_index];
-}
-
-inline size_t MappedSegment::get_metadata_size_from_descriptor() const {
-    if (page_descriptors_[0].status == PageStatus::METADATA_START) {
-        return reinterpret_cast<size_t>(page_descriptors_[0].slab_ptr);
-    }
-    return 0;
 }
 
 } // namespace internal
