@@ -8,7 +8,6 @@
 #endif
 
 namespace my_malloc {
-namespace internal {
 
 SmallSlabHeader::SmallSlabHeader(uint16_t slab_class_id) {
     this->slab_class_id_ = slab_class_id;
@@ -119,5 +118,4 @@ bool SmallSlabHeader::is_empty() const {
     return this->free_count_ == info.slab_capacity;
 }
 
-} // namespace internal
 } // namespace my_malloc

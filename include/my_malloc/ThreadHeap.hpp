@@ -37,7 +37,7 @@ class ThreadHeap {
 // private:
 
     struct SlabCache {
-        internal::SmallSlabHeader list_head;
+        SmallSlabHeader list_head;
         SlabCache() : list_head() {}
     };
 
@@ -51,26 +51,33 @@ class ThreadHeap {
     std::atomic<PendingFreeNode*> pending_free_list_head_{nullptr};
     std::atomic<size_t> pending_free_count_{0};
 
-    SlabCache slab_caches_[internal::MAX_NUM_SIZE_CLASSES];
-    internal::LargeSlabHeader* free_slabs_[internal::SEGMENT_SIZE / internal::PAGE_SIZE]{};
+    SlabCache slab_caches_[MAX_NUM_SIZE_CLASSES];
+    LargeSlabHeader* free_slabs_[SEGMENT_SIZE / PAGE_SIZE]{};
 
-    internal::MappedSegment* active_segments_{nullptr};
-    internal::MappedSegment* huge_segments_{nullptr};
+    MappedSegment* active_segments_{nullptr};
+    MappedSegment* huge_segments_{nullptr};
+
+    void* allocate_from_small_slab_cache(size_t class_id);
+    void* allocate_huge_slab(size_t size);
 
 
     void process_pending_frees();
 
-    internal::SmallSlabHeader* allocate_small_slab(size_t class_id);
+    SmallSlabHeader* allocate_small_slab(size_t class_id);
     void* allocate_large_slab(uint16_t num_pages);
     void* acquire_pages(uint16_t num_pages);
 
-    internal::LargeSlabHeader* initialize_as_free_slab(void* slab_ptr, uint16_t num_pages);
+    LargeSlabHeader* initialize_as_free_slab(void* slab_ptr, uint16_t num_pages);
 
-    void* split_slab(internal::LargeSlabHeader* slab_to_split, uint16_t required_pages);
+    void free_huge_slab(MappedSegment* segment);
+    void free_large_slab(void* slab_ptr);
+    void free_in_small_slab(void* ptr, SmallSlabHeader* header);
+
+    void* split_slab(LargeSlabHeader* slab_to_split, uint16_t required_pages);
     void release_slab(void* slab_ptr, uint16_t num_pages);
 
-    void prepend_to_freelist(internal::LargeSlabHeader* node_to_add);
-    void remove_from_freelist(internal::LargeSlabHeader* node_to_remove);
+    void prepend_to_freelist(LargeSlabHeader* node_to_add);
+    void remove_from_freelist(LargeSlabHeader* node_to_remove);
 };
 
 } // namespace my_malloc

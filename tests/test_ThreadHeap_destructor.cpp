@@ -37,14 +37,14 @@ protected:
     }
 
     // 手动创建一个对齐的 MappedSegment，以进行精确的测试设置
-    internal::MappedSegment* create_aligned_segment_for_test() {
+    MappedSegment* create_aligned_segment_for_test() {
         void* mem = nullptr;
-        if (::posix_memalign(&mem, internal::SEGMENT_SIZE, sizeof(internal::MappedSegment)) != 0) {
+        if (::posix_memalign(&mem, SEGMENT_SIZE, sizeof(MappedSegment)) != 0) {
             return nullptr;
         }
         
         // 直接调用 public 构造函数
-        internal::MappedSegment* seg = new (mem) internal::MappedSegment();
+        MappedSegment* seg = new (mem) MappedSegment();
         seg->set_owner_heap(heap_);
         
         raw_segment_memory_to_free_.push_back(mem);
@@ -52,7 +52,7 @@ protected:
     }
     
     // 辅助函数，将一组 segments 链接成一个单向链表
-    void link_segments(const std::vector<internal::MappedSegment*>& segments, internal::MappedSegment*& list_head) {
+    void link_segments(const std::vector<MappedSegment*>& segments, MappedSegment*& list_head) {
         if (segments.empty()) {
             list_head = nullptr;
             return;
@@ -75,7 +75,7 @@ TEST_F(ThreadHeapDestructorTest, WithEmptyHeap) {
 }
 
 TEST_F(ThreadHeapDestructorTest, WithSingleActiveSegment) {
-    internal::MappedSegment* seg = create_aligned_segment_for_test();
+    MappedSegment* seg = create_aligned_segment_for_test();
     // 直接访问成员变量来设置内部状态
     heap_->active_segments_ = seg;
     
@@ -103,9 +103,9 @@ TEST_F(RealDestructorTest, DestructorCleansUpAllSegments) {
     ThreadHeap* heap = new ThreadHeap();
     
     // 创建一些模拟的 Segment
-    std::vector<internal::MappedSegment*> active_segs, free_segs;
-    for(int i = 0; i < 3; ++i) active_segs.push_back(internal::MappedSegment::create());
-    for(int i = 0; i < 2; ++i) free_segs.push_back(internal::MappedSegment::create());
+    std::vector<MappedSegment*> active_segs, free_segs;
+    for(int i = 0; i < 3; ++i) active_segs.push_back(MappedSegment::create());
+    for(int i = 0; i < 2; ++i) free_segs.push_back(MappedSegment::create());
     
     // 链接它们
     if (!active_segs.empty()) {

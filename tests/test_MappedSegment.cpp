@@ -3,8 +3,7 @@
 
 // 所有之前的测试（生命周期、功能性、元数据）仍然有效。
 
-using my_malloc::ThreadHeap;
-using namespace my_malloc::internal;
+using namespace my_malloc;
 
 // --- 测试套件：生命周期 ---
 class MappedSegmentTest : public ::testing::Test {
@@ -79,43 +78,3 @@ TEST_F(MappedSegmentTest, ConstructorInitializesMetadataCorrectly) {
 class MappedSegmentAllocationTest : public MappedSegmentTest {
     // 继承自 MappedSegmentTest，为每个测试获取一个新的 segment_ 实例。
 };
-
-TEST_F(MappedSegmentAllocationTest, AllocateSinglePage) {
-    // 这里的测试逻辑需要依赖您最终的 MappedSegment.cpp 实现
-    // 假设构造函数已正确设置了 next_free_page_idx_
-    const size_t num_metadata_pages = (sizeof(MappedSegment) + PAGE_SIZE - 1) / PAGE_SIZE;
-    
-    // 如果您的 linear_allocate_pages 负责首次初始化，这里的 initial_next_idx 就是 0
-    // 如果您的构造函数负责，这里的 initial_next_idx 就是 num_metadata_pages
-    // 我们假设构造函数是正确的
-    uint16_t initial_next_idx = num_metadata_pages; 
-    // segment_->next_free_page_idx_ 应该是 private 的，不能直接访问
-    // 我们通过分配来间接验证
-
-    void* ptr = segment_->linear_allocate_pages(1);
-    ASSERT_NE(ptr, nullptr);
-
-    // 检查返回的指针是否在正确的偏移位置
-    void* expected_ptr = reinterpret_cast<char*>(segment_) + initial_next_idx * PAGE_SIZE;
-    EXPECT_EQ(ptr, expected_ptr);
-}
-
-// ... (其他 MappedSegmentAllocationTest 测试用例保持不变) ...
-
-TEST_F(MappedSegmentAllocationTest, AllocateMultiplePages) {
-    const size_t num_metadata_pages = (sizeof(MappedSegment) + PAGE_SIZE - 1) / PAGE_SIZE;
-    const uint16_t initial_next_idx = num_metadata_pages;
-    const uint16_t pages_to_alloc = 10;
-    
-    void* ptr = segment_->linear_allocate_pages(pages_to_alloc);
-    ASSERT_NE(ptr, nullptr);
-
-    void* expected_ptr = reinterpret_cast<char*>(segment_) + initial_next_idx * PAGE_SIZE;
-    EXPECT_EQ(ptr, expected_ptr);
-}
-
-TEST_F(MappedSegmentAllocationTest, AllocateTooManyPagesFails) {
-    const size_t total_pages = SEGMENT_SIZE / PAGE_SIZE;
-    void* ptr = segment_->linear_allocate_pages(total_pages + 1);
-    EXPECT_EQ(ptr, nullptr);
-}

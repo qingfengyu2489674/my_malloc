@@ -24,17 +24,17 @@ protected:
 // 测试用例 1: 验证释放单页大对象
 // ===================================================================================
 TEST_F(FreeTest, FreeSinglePageLargeObjectResetsStatus) {
-    void* ptr = heap_->allocate(internal::MAX_SMALL_OBJECT_SIZE + 1);
+    void* ptr = heap_->allocate(MAX_SMALL_OBJECT_SIZE + 1);
     ASSERT_NE(ptr, nullptr);
 
-    internal::MappedSegment* seg = internal::MappedSegment::get_segment(ptr);
-    internal::PageDescriptor* desc_before = seg->get_page_desc(ptr);
-    ASSERT_EQ(desc_before->status, internal::PageStatus::LARGE_SLAB);
+    MappedSegment* seg = MappedSegment::get_segment(ptr);
+    PageDescriptor* desc_before = seg->get_page_desc(ptr);
+    ASSERT_EQ(desc_before->status, PageStatus::LARGE_SLAB);
 
     heap_->free(ptr);
 
-    internal::PageDescriptor* desc_after = seg->get_page_desc(ptr);
-    EXPECT_EQ(desc_after->status, internal::PageStatus::FREE);
+    PageDescriptor* desc_after = seg->get_page_desc(ptr);
+    EXPECT_EQ(desc_after->status, PageStatus::FREE);
 }
 
 // ===================================================================================
@@ -42,21 +42,21 @@ TEST_F(FreeTest, FreeSinglePageLargeObjectResetsStatus) {
 // ===================================================================================
 TEST_F(FreeTest, FreeMultiPageLargeObjectResetsAllStatuses) {
     const size_t num_pages = 4;
-    const size_t large_size = internal::MAX_SMALL_OBJECT_SIZE + num_pages * internal::PAGE_SIZE;
+    const size_t large_size = MAX_SMALL_OBJECT_SIZE + num_pages * PAGE_SIZE;
     void* ptr = heap_->allocate(large_size);
     ASSERT_NE(ptr, nullptr);
 
     heap_->free(ptr);
 
     // 验证: 遍历这 4 页，检查每一页的 PageDescriptor 状态
-    internal::MappedSegment* seg = internal::MappedSegment::get_segment(ptr);
+    MappedSegment* seg = MappedSegment::get_segment(ptr);
     for (size_t i = 0; i < num_pages; ++i) {
-        char* current_page_ptr = static_cast<char*>(ptr) + i * internal::PAGE_SIZE;
-        internal::PageDescriptor* desc = seg->get_page_desc(current_page_ptr);
+        char* current_page_ptr = static_cast<char*>(ptr) + i * PAGE_SIZE;
+        PageDescriptor* desc = seg->get_page_desc(current_page_ptr);
         
         // 使用 SCOPED_TRACE 可以在测试失败时打印出循环变量 i 的值，方便调试
         SCOPED_TRACE("Checking page index " + std::to_string(i));
-        EXPECT_EQ(desc->status, internal::PageStatus::FREE);
+        EXPECT_EQ(desc->status, PageStatus::FREE);
     }
 }
 
@@ -73,19 +73,19 @@ TEST_F(FreeTest, FreeNullptrIsSafe) {
 // 测试用例 4: 尝试释放一个无效指针（slab 的中间部分）
 // ===================================================================================
 TEST_F(FreeTest, FreeInvalidPointerDoesNothing) {
-    void* ptr = heap_->allocate(internal::MAX_SMALL_OBJECT_SIZE + 2 * internal::PAGE_SIZE);
+    void* ptr = heap_->allocate(MAX_SMALL_OBJECT_SIZE + 2 * PAGE_SIZE);
     ASSERT_NE(ptr, nullptr);
 
-    void* invalid_ptr = static_cast<char*>(ptr) + internal::PAGE_SIZE;
+    void* invalid_ptr = static_cast<char*>(ptr) + PAGE_SIZE;
     
-    internal::MappedSegment* seg = internal::MappedSegment::get_segment(ptr);
-    internal::PageDescriptor* desc_before = seg->get_page_desc(invalid_ptr);
-    ASSERT_EQ(desc_before->status, internal::PageStatus::LARGE_SLAB);
+    MappedSegment* seg = MappedSegment::get_segment(ptr);
+    PageDescriptor* desc_before = seg->get_page_desc(invalid_ptr);
+    ASSERT_EQ(desc_before->status, PageStatus::LARGE_SLAB);
 
     heap_->free(invalid_ptr);
 
-    internal::PageDescriptor* desc_after = seg->get_page_desc(invalid_ptr);
-    EXPECT_EQ(desc_after->status, internal::PageStatus::FREE);
+    PageDescriptor* desc_after = seg->get_page_desc(invalid_ptr);
+    EXPECT_EQ(desc_after->status, PageStatus::FREE);
 }
 
 } // namespace my_malloc

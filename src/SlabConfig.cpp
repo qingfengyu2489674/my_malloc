@@ -5,7 +5,6 @@
 #include <stddef.h> // For offsetof
 
 namespace my_malloc {
-namespace internal {
 
 const SlabConfig& SlabConfig::get_instance() {
     // C++11 保证了局部静态变量的初始化是线程安全的，且只执行一次。
@@ -137,5 +136,4 @@ void SlabConfig::build_lookup_table() {
     size_to_class_map_[0] = 0;
 }
 
-} // namespace internal
 } // namespace my_malloc

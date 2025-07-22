@@ -10,17 +10,9 @@
 #include <my_malloc/sys/mman.hpp>
 
 namespace my_malloc {
-    class ThreadHeap;
-    // class ThreadHeapDestructorTest;
-}
 
-namespace my_malloc {
-namespace internal {
+class ThreadHeap;
 
-/**
- * @class MappedSegment
- * @brief 代表一块直接从操作系统 mmap 而来的、自包含元数据的大块内存。
- */
 class MappedSegment {
 public:
     struct ListNode {
@@ -45,9 +37,7 @@ public:
     
     PageDescriptor* get_page_desc(const void* ptr);
     const PageDescriptor* get_page_desc(const void* ptr) const;
-
-    void* linear_allocate_pages(uint16_t num_pages);
-
+    
 // private:
 
     MappedSegment();
@@ -83,7 +73,6 @@ inline const PageDescriptor* MappedSegment::get_page_desc(const void* ptr) const
     return &page_descriptors_[page_index];
 }
 
-} // namespace internal
 } // namespace my_malloc
 
 #endif // MY_MALLOC_ALLOC_INTERNALS_MAPPED_SEGMENT_HPP

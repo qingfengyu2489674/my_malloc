@@ -5,7 +5,6 @@
 
 // 使用命名空间在测试文件中是安全的
 using namespace my_malloc;
-using namespace my_malloc::internal;
 
 /**
  * @brief Small Object 分配与释放的测试固件 (Test Fixture)

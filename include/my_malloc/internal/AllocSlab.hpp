@@ -5,7 +5,6 @@
 #include <my_malloc/internal/definitions.hpp>
 
 namespace my_malloc {
-namespace internal {
 
 struct LargeSlabHeader {
     LargeSlabHeader* prev = nullptr;
@@ -45,7 +44,6 @@ public:
     bool is_empty() const;
 };
 
-} // namespace internal
 } // namespace my_malloc
 
 #endif // MY_MALLOC_ALLOC_INTERNALS_SLAB_HPP

@@ -4,7 +4,7 @@
 #include <stddef.h> // For offsetof
 #include <climits> // For SIZE_MAX
 
-using namespace my_malloc::internal;
+using namespace my_malloc;
 
 // --- 测试固件 (Test Fixture) ---
 // 使用固件可以方便地在多个测试用例中复用一个已经获取到的 SlabConfig 实例。

@@ -10,8 +10,8 @@ class ThreadHeapFriend : public my_malloc::ThreadHeap {
 public:
     void* test_acquire_pages(uint16_t num_pages) { return acquire_pages(num_pages); }
     void test_release_slab(void* ptr, uint16_t num_pages) { release_slab(ptr, num_pages); }
-    my_malloc::internal::MappedSegment* get_active_segments() { return active_segments_; }
-    my_malloc::internal::LargeSlabHeader* get_freelist_head(uint16_t num_pages) {
+    my_malloc::MappedSegment* get_active_segments() { return active_segments_; }
+    my_malloc::LargeSlabHeader* get_freelist_head(uint16_t num_pages) {
         if (num_pages == 0 || num_pages > 512) return nullptr;
         return free_slabs_[num_pages - 1];
     }
@@ -39,16 +39,16 @@ TEST_F(AcquireSlabTest, CreateNewSegmentWhenFreeListIsEmpty) {
 
     // 验证：
     // 1. 创建了一个新的 active segment
-    internal::MappedSegment* seg1 = heap_->get_active_segments();
+    MappedSegment* seg1 = heap_->get_active_segments();
     ASSERT_NE(seg1, nullptr);
-    EXPECT_EQ(internal::MappedSegment::get_segment(slab10_header), seg1);
+    EXPECT_EQ(MappedSegment::get_segment(slab10_header), seg1);
 
     // 2. freelist 中应该有一个大的剩余块
-    const size_t metadata_pages = (sizeof(internal::MappedSegment) + internal::PAGE_SIZE - 1) / internal::PAGE_SIZE;
-    const uint16_t available_pages = (internal::SEGMENT_SIZE / internal::PAGE_SIZE) - metadata_pages;
+    const size_t metadata_pages = (sizeof(MappedSegment) + PAGE_SIZE - 1) / PAGE_SIZE;
+    const uint16_t available_pages = (SEGMENT_SIZE / PAGE_SIZE) - metadata_pages;
     const uint16_t remaining_pages = available_pages - 10;
     
-    internal::LargeSlabHeader* remainder = heap_->get_freelist_head(remaining_pages);
+    LargeSlabHeader* remainder = heap_->get_freelist_head(remaining_pages);
     ASSERT_NE(remainder, nullptr);
     EXPECT_EQ(remainder->num_pages_, remaining_pages);
 }
@@ -58,7 +58,7 @@ TEST_F(AcquireSlabTest, CreateNewSegmentWhenFreeListIsEmpty) {
 // 边界条件测试 (保持不变)
 // ===================================================================================
 TEST_F(AcquireSlabTest, RequestSlabLargerThanSegment) {
-    void* slab = heap_->test_acquire_pages(internal::SEGMENT_SIZE / internal::PAGE_SIZE + 1);
+    void* slab = heap_->test_acquire_pages(SEGMENT_SIZE / PAGE_SIZE + 1);
     EXPECT_EQ(slab, nullptr);
 }
 

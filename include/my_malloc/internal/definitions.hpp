@@ -10,7 +10,6 @@ namespace my_malloc {
 }
 
 namespace my_malloc {
-namespace internal {
 
 constexpr size_t PAGE_SIZE = 4 * 1024;
 constexpr size_t SEGMENT_SIZE = 2 * 1024 * 1024;
@@ -29,7 +28,6 @@ struct PageDescriptor {
     void* slab_ptr = nullptr;
 };
 
-} // namespace internal
 } // namespace my_malloc
 
 #endif // MY_MALLOC_ALLOC_INTERNALS_DEFINITIONS_HPP

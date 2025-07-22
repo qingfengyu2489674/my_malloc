@@ -12,8 +12,8 @@ namespace my_malloc {
 
 class ThreadHeapFriend : public ThreadHeap {
 public:
-    internal::LargeSlabHeader* get_freelist_head(uint16_t num_pages) {
-        if (num_pages == 0 || num_pages > (internal::SEGMENT_SIZE / internal::PAGE_SIZE)) {
+    LargeSlabHeader* get_freelist_head(uint16_t num_pages) {
+        if (num_pages == 0 || num_pages > (SEGMENT_SIZE / PAGE_SIZE)) {
             return nullptr;
         }
         return free_slabs_[num_pages - 1];
@@ -22,12 +22,12 @@ public:
     uint16_t get_slab_pages_from_user_ptr(void* user_ptr) {
         if (!user_ptr) return 0;
         // 注意：这个辅助函数只对 Large Object 有效
-        void* header_ptr = static_cast<char*>(user_ptr) - sizeof(my_malloc::internal::LargeSlabHeader);
-        auto* header = static_cast<internal::LargeSlabHeader*>(header_ptr);
+        void* header_ptr = static_cast<char*>(user_ptr) - sizeof(my_malloc::LargeSlabHeader);
+        auto* header = static_cast<LargeSlabHeader*>(header_ptr);
         return header->num_pages_;
     }
 
-    internal::MappedSegment* get_active_segments() {
+    MappedSegment* get_active_segments() {
         return active_segments_;
     }
 };
@@ -35,7 +35,7 @@ public:
 class LifecycleAndCoalescingE2ETest : public ::testing::Test {
 protected:
     ThreadHeapFriend* heap_ = nullptr;
-    const size_t header_size = sizeof(internal::LargeSlabHeader);
+    const size_t header_size = sizeof(LargeSlabHeader);
 
     void SetUp() override {
         heap_ = new ThreadHeapFriend();
@@ -59,23 +59,23 @@ TEST_F(LifecycleAndCoalescingE2ETest, FullLifecycleOfSegment) {
 
     // 2. 【分裂场景】第一次分配 (Large Object)，触发创建第一个 Segment
     //    这将创建一个新 Segment，并将其大部分空间格式化为一个大的 Free Slab，然后从中分裂。
-    const size_t large_user_size_A = internal::MAX_SMALL_OBJECT_SIZE + 10 * internal::PAGE_SIZE;
+    const size_t large_user_size_A = MAX_SMALL_OBJECT_SIZE + 10 * PAGE_SIZE;
     void* ptr_A = heap_->allocate(large_user_size_A);
     ASSERT_NE(ptr_A, nullptr);
 
     // 验证：
     // a. 现在应该有一个 active segment
-    internal::MappedSegment* seg1 = heap_->get_active_segments();
+    MappedSegment* seg1 = heap_->get_active_segments();
     ASSERT_NE(seg1, nullptr);
     EXPECT_EQ(seg1->list_node.next, nullptr);
 
     // b. freelist 中应该有一个大的剩余块
     uint16_t pages_A = heap_->get_slab_pages_from_user_ptr(ptr_A);
-    const size_t metadata_pages = (sizeof(internal::MappedSegment) + internal::PAGE_SIZE - 1) / internal::PAGE_SIZE;
-    const uint16_t total_available_pages = (internal::SEGMENT_SIZE / internal::PAGE_SIZE) - metadata_pages;
+    const size_t metadata_pages = (sizeof(MappedSegment) + PAGE_SIZE - 1) / PAGE_SIZE;
+    const uint16_t total_available_pages = (SEGMENT_SIZE / PAGE_SIZE) - metadata_pages;
     uint16_t remaining_pages_1 = total_available_pages - pages_A;
     
-    internal::LargeSlabHeader* remainder1 = heap_->get_freelist_head(remaining_pages_1);
+    LargeSlabHeader* remainder1 = heap_->get_freelist_head(remaining_pages_1);
     ASSERT_NE(remainder1, nullptr) << "A large free slab should exist after the first allocation.";
     EXPECT_EQ(remainder1->num_pages_, remaining_pages_1);
 
@@ -92,17 +92,17 @@ TEST_F(LifecycleAndCoalescingE2ETest, FullLifecycleOfSegment) {
     expect_freelist_is_empty(remaining_pages_1);
 
     // c. 出现了一个新的、更小的剩余块
-    const auto& info_B = internal::SlabConfig::get_instance().get_info(
-        internal::SlabConfig::get_instance().get_size_class_index(small_user_size_B)
+    const auto& info_B = SlabConfig::get_instance().get_info(
+        SlabConfig::get_instance().get_size_class_index(small_user_size_B)
     );
     uint16_t pages_B = info_B.slab_pages;
     uint16_t remaining_pages_2 = remaining_pages_1 - pages_B;
-    internal::LargeSlabHeader* remainder2 = heap_->get_freelist_head(remaining_pages_2);
+    LargeSlabHeader* remainder2 = heap_->get_freelist_head(remaining_pages_2);
     ASSERT_NE(remainder2, nullptr) << "A smaller free slab should exist after the second allocation.";
     EXPECT_EQ(remainder2->num_pages_, remaining_pages_2);
 
     // 4. 【分裂场景】第三次分配 (另一个 Large Object)
-    const size_t large_user_size_C = internal::MAX_SMALL_OBJECT_SIZE + 50 * internal::PAGE_SIZE;
+    const size_t large_user_size_C = MAX_SMALL_OBJECT_SIZE + 50 * PAGE_SIZE;
     void* ptr_C = heap_->allocate(large_user_size_C);
     ASSERT_NE(ptr_C, nullptr);
     uint16_t pages_C = heap_->get_slab_pages_from_user_ptr(ptr_C);
@@ -121,7 +121,7 @@ TEST_F(LifecycleAndCoalescingE2ETest, FullLifecycleOfSegment) {
 
     uint16_t remaining_pages_3 = remaining_pages_2 - pages_C;
     uint16_t merged_C_size = pages_C + remaining_pages_3;
-    internal::LargeSlabHeader* merged_C = heap_->get_freelist_head(merged_C_size);
+    LargeSlabHeader* merged_C = heap_->get_freelist_head(merged_C_size);
     ASSERT_NE(merged_C, nullptr) << "Block C and the final remainder should have coalesced.";
     EXPECT_EQ(merged_C->num_pages_, merged_C_size);
 
@@ -135,7 +135,7 @@ TEST_F(LifecycleAndCoalescingE2ETest, FullLifecycleOfSegment) {
     expect_freelist_is_empty(merged_C_size);
 
     // 最终应该合并回一个占满整个 Segment 的大空闲块
-    internal::LargeSlabHeader* final_block = heap_->get_freelist_head(total_available_pages);
+    LargeSlabHeader* final_block = heap_->get_freelist_head(total_available_pages);
     ASSERT_NE(final_block, nullptr) << "All blocks should coalesce back to a single segment-sized block.";
     EXPECT_EQ(final_block->num_pages_, total_available_pages);
 }

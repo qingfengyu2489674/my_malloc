@@ -6,7 +6,7 @@
 #include <set>       // For std::set
 #include <new>       // For placement new
 
-using namespace my_malloc::internal;
+using namespace my_malloc;
 
 // --- 测试固件 (Test Fixture) ---
 // 这个固件负责模拟一块 Slab 内存，并在其上构造 SmallSlabHeader。
