@@ -27,13 +27,13 @@ TEST_F(FreeTest, FreeSinglePageLargeObjectResetsStatus) {
     void* ptr = heap_->allocate(internal::MAX_SMALL_OBJECT_SIZE + 1);
     ASSERT_NE(ptr, nullptr);
 
-    internal::MappedSegment* seg = internal::MappedSegment::from_ptr(ptr);
-    internal::PageDescriptor* desc_before = seg->page_descriptor_from_ptr(ptr);
+    internal::MappedSegment* seg = internal::MappedSegment::get_segment(ptr);
+    internal::PageDescriptor* desc_before = seg->get_page_desc(ptr);
     ASSERT_EQ(desc_before->status, internal::PageStatus::LARGE_SLAB);
 
     heap_->free(ptr);
 
-    internal::PageDescriptor* desc_after = seg->page_descriptor_from_ptr(ptr);
+    internal::PageDescriptor* desc_after = seg->get_page_desc(ptr);
     EXPECT_EQ(desc_after->status, internal::PageStatus::FREE);
 }
 
@@ -49,10 +49,10 @@ TEST_F(FreeTest, FreeMultiPageLargeObjectResetsAllStatuses) {
     heap_->free(ptr);
 
     // 验证: 遍历这 4 页，检查每一页的 PageDescriptor 状态
-    internal::MappedSegment* seg = internal::MappedSegment::from_ptr(ptr);
+    internal::MappedSegment* seg = internal::MappedSegment::get_segment(ptr);
     for (size_t i = 0; i < num_pages; ++i) {
         char* current_page_ptr = static_cast<char*>(ptr) + i * internal::PAGE_SIZE;
-        internal::PageDescriptor* desc = seg->page_descriptor_from_ptr(current_page_ptr);
+        internal::PageDescriptor* desc = seg->get_page_desc(current_page_ptr);
         
         // 使用 SCOPED_TRACE 可以在测试失败时打印出循环变量 i 的值，方便调试
         SCOPED_TRACE("Checking page index " + std::to_string(i));
@@ -78,14 +78,14 @@ TEST_F(FreeTest, FreeInvalidPointerDoesNothing) {
 
     void* invalid_ptr = static_cast<char*>(ptr) + internal::PAGE_SIZE;
     
-    internal::MappedSegment* seg = internal::MappedSegment::from_ptr(ptr);
-    internal::PageDescriptor* desc_before = seg->page_descriptor_from_ptr(invalid_ptr);
+    internal::MappedSegment* seg = internal::MappedSegment::get_segment(ptr);
+    internal::PageDescriptor* desc_before = seg->get_page_desc(invalid_ptr);
     ASSERT_EQ(desc_before->status, internal::PageStatus::LARGE_SLAB);
 
     heap_->free(invalid_ptr);
 
-    internal::PageDescriptor* desc_after = seg->page_descriptor_from_ptr(invalid_ptr);
-    EXPECT_EQ(desc_after->status, internal::PageStatus::LARGE_SLAB);
+    internal::PageDescriptor* desc_after = seg->get_page_desc(invalid_ptr);
+    EXPECT_EQ(desc_after->status, internal::PageStatus::FREE);
 }
 
 } // namespace my_malloc

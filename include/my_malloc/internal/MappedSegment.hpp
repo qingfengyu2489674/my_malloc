@@ -33,7 +33,7 @@ public:
     static MappedSegment* create(size_t segment_size = SEGMENT_SIZE);
     static void destroy(MappedSegment* segment);
 
-    static MappedSegment* from_ptr(const void* ptr);
+    static MappedSegment* get_segment(const void* ptr);
 
     ThreadHeap* get_owner_heap() const { 
         return owner_heap_; 
@@ -43,8 +43,8 @@ public:
         owner_heap_ = heap; 
     }
     
-    PageDescriptor* page_descriptor_from_ptr(const void* ptr);
-    const PageDescriptor* page_descriptor_from_ptr(const void* ptr) const;
+    PageDescriptor* get_page_desc(const void* ptr);
+    const PageDescriptor* get_page_desc(const void* ptr) const;
 
     void* linear_allocate_pages(uint16_t num_pages);
 
@@ -67,18 +67,18 @@ public:
 };
 
 
-inline MappedSegment* MappedSegment::from_ptr(const void* ptr) {
+inline MappedSegment* MappedSegment::get_segment(const void* ptr) {
     return reinterpret_cast<MappedSegment*>(
         reinterpret_cast<uintptr_t>(ptr) & ~(SEGMENT_SIZE - 1)
     );
 }
 
-inline PageDescriptor* MappedSegment::page_descriptor_from_ptr(const void* ptr) {
+inline PageDescriptor* MappedSegment::get_page_desc(const void* ptr) {
     const size_t page_index = (reinterpret_cast<uintptr_t>(ptr) - reinterpret_cast<uintptr_t>(this)) / PAGE_SIZE;
     return &page_descriptors_[page_index];
 }
 
-inline const PageDescriptor* MappedSegment::page_descriptor_from_ptr(const void* ptr) const {
+inline const PageDescriptor* MappedSegment::get_page_desc(const void* ptr) const {
     const size_t page_index = (reinterpret_cast<uintptr_t>(ptr) - reinterpret_cast<uintptr_t>(this)) / PAGE_SIZE;
     return &page_descriptors_[page_index];
 }

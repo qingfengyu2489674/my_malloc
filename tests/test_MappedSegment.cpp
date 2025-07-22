@@ -37,10 +37,10 @@ TEST_F(MappedSegmentTest, Alignment) {
 
 TEST_F(MappedSegmentTest, FromPtrLookup) {
     void* ptr_start = segment_;
-    EXPECT_EQ(MappedSegment::from_ptr(ptr_start), segment_);
+    EXPECT_EQ(MappedSegment::get_segment(ptr_start), segment_);
     char* ptr_middle_raw = reinterpret_cast<char*>(segment_) + (SEGMENT_SIZE / 2);
     void* ptr_middle = static_cast<void*>(ptr_middle_raw);
-    EXPECT_EQ(MappedSegment::from_ptr(ptr_middle), segment_);
+    EXPECT_EQ(MappedSegment::get_segment(ptr_middle), segment_);
 }
 
 
@@ -53,7 +53,7 @@ TEST_F(MappedSegmentTest, ConstructorInitializesMetadataCorrectly) {
     const size_t num_metadata_pages = (metadata_size + PAGE_SIZE - 1) / PAGE_SIZE;
 
     // 检查第一页
-    const PageDescriptor* desc_first = segment_->page_descriptor_from_ptr(segment_);
+    const PageDescriptor* desc_first = segment_->get_page_desc(segment_);
     EXPECT_EQ(desc_first->status, PageStatus::METADATA);
     // 假设您的最终设计是将 slab_ptr 指向 segment
     EXPECT_EQ(desc_first->slab_ptr, segment_); 
@@ -61,7 +61,7 @@ TEST_F(MappedSegmentTest, ConstructorInitializesMetadataCorrectly) {
     // 检查后续的元数据页
     for (size_t i = 1; i < num_metadata_pages; ++i) {
         void* ptr_in_page = reinterpret_cast<char*>(segment_) + i * PAGE_SIZE;
-        const PageDescriptor* desc_sub = segment_->page_descriptor_from_ptr(ptr_in_page);
+        const PageDescriptor* desc_sub = segment_->get_page_desc(ptr_in_page);
         EXPECT_EQ(desc_sub->status, PageStatus::METADATA);
         EXPECT_EQ(desc_sub->slab_ptr, segment_);
     }

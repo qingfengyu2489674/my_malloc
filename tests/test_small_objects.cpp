@@ -41,8 +41,8 @@ TEST_F(SmallObjectTest, AllocateFirstSmallObject) {
     ASSERT_NE(ptr, nullptr) << "首次分配不应失败";
 
     // 2. 验证 PageDescriptor 的状态
-    MappedSegment* segment = MappedSegment::from_ptr(ptr);
-    PageDescriptor* desc = segment->page_descriptor_from_ptr(ptr);
+    MappedSegment* segment = MappedSegment::get_segment(ptr);
+    PageDescriptor* desc = segment->get_page_desc(ptr);
     
     // 页面状态应为 SMALL_SLAB 或 SMALL_SLAB
     ASSERT_TRUE(desc->status == PageStatus::SMALL_SLAB || desc->status == PageStatus::SMALL_SLAB)
@@ -75,8 +75,8 @@ TEST_F(SmallObjectTest, AllocateOnFastPathReusesSlab) {
     ASSERT_NE(ptr1, ptr2) << "连续分配应返回不同地址";
 
     // 2. 验证它们是否来自同一个 Slab
-    PageDescriptor* desc1 = MappedSegment::from_ptr(ptr1)->page_descriptor_from_ptr(ptr1);
-    PageDescriptor* desc2 = MappedSegment::from_ptr(ptr2)->page_descriptor_from_ptr(ptr2);
+    PageDescriptor* desc1 = MappedSegment::get_segment(ptr1)->get_page_desc(ptr1);
+    PageDescriptor* desc2 = MappedSegment::get_segment(ptr2)->get_page_desc(ptr2);
 
     EXPECT_EQ(desc1->slab_ptr, desc2->slab_ptr) << "快车道分配未能复用同一个 Slab";
 }
@@ -104,7 +104,7 @@ TEST_F(SmallObjectTest, SlabIsRemovedWhenFullAndNewOneIsCreated) {
 
     // 2. 验证 Slab 状态
     void* first_ptr = pointers.front();
-    PageDescriptor* desc = MappedSegment::from_ptr(first_ptr)->page_descriptor_from_ptr(first_ptr);
+    PageDescriptor* desc = MappedSegment::get_segment(first_ptr)->get_page_desc(first_ptr);
     auto* slab = reinterpret_cast<SmallSlabHeader*>(desc->slab_ptr);
     ASSERT_TRUE(slab->is_full()) << "Slab 分配满后，is_full() 应返回 true";
 
@@ -113,7 +113,7 @@ TEST_F(SmallObjectTest, SlabIsRemovedWhenFullAndNewOneIsCreated) {
     ASSERT_NE(ptr_new_slab, nullptr);
 
     // 4. 验证新对象来自一个全新的 Slab
-    PageDescriptor* desc_new = MappedSegment::from_ptr(ptr_new_slab)->page_descriptor_from_ptr(ptr_new_slab);
+    PageDescriptor* desc_new = MappedSegment::get_segment(ptr_new_slab)->get_page_desc(ptr_new_slab);
     EXPECT_NE(desc_new->slab_ptr, desc->slab_ptr) << "Slab 变满后，新的分配请求未能创建新的 Slab";
 
     // 清理
@@ -142,7 +142,7 @@ TEST_F(SmallObjectTest, FreeingFromFullSlabMakesItAvailableAgain) {
     }
     
     // 2. 获取原始 Slab 的指针
-    void* original_slab_ptr = MappedSegment::from_ptr(pointers.front())->page_descriptor_from_ptr(pointers.front())->slab_ptr;
+    void* original_slab_ptr = MappedSegment::get_segment(pointers.front())->get_page_desc(pointers.front())->slab_ptr;
 
     // 3. 释放其中一个块，使 Slab 从 "Full" -> "Partial"
     heap->free(pointers.back());
@@ -153,7 +153,7 @@ TEST_F(SmallObjectTest, FreeingFromFullSlabMakesItAvailableAgain) {
     ASSERT_NE(ptr_reused, nullptr);
     
     // 5. 验证这次分配复用了之前的 Slab，而不是创建新 Slab
-    void* reused_slab_ptr = MappedSegment::from_ptr(ptr_reused)->page_descriptor_from_ptr(ptr_reused)->slab_ptr;
+    void* reused_slab_ptr = MappedSegment::get_segment(ptr_reused)->get_page_desc(ptr_reused)->slab_ptr;
     EXPECT_EQ(reused_slab_ptr, original_slab_ptr) << "从已满 Slab 释放后，未能复用该 Slab";
     
     // 清理
@@ -175,8 +175,8 @@ TEST_F(SmallObjectTest, FreeingLastObjectRecyclesSlabMemory) {
     ASSERT_NE(ptr, nullptr);
 
     // 2. 记录 Slab 的信息
-    MappedSegment* segment = MappedSegment::from_ptr(ptr);
-    PageDescriptor* desc_before_free = segment->page_descriptor_from_ptr(ptr);
+    MappedSegment* segment = MappedSegment::get_segment(ptr);
+    PageDescriptor* desc_before_free = segment->get_page_desc(ptr);
     void* slab_address = desc_before_free->slab_ptr;
     
     const auto& config = SlabConfig::get_instance();
@@ -190,7 +190,7 @@ TEST_F(SmallObjectTest, FreeingLastObjectRecyclesSlabMemory) {
     // 4. 验证 Slab 占用的所有页面的状态都已变回 FREE
     for (uint16_t i = 0; i < num_pages; ++i) {
         char* current_page_ptr = static_cast<char*>(slab_address) + i * PAGE_SIZE;
-        PageDescriptor* desc_after_free = segment->page_descriptor_from_ptr(current_page_ptr);
+        PageDescriptor* desc_after_free = segment->get_page_desc(current_page_ptr);
         
         EXPECT_EQ(desc_after_free->status, PageStatus::FREE) 
             << "释放最后一个对象后，第 " << i << " 页的状态未重置为 FREE";
@@ -215,12 +215,12 @@ TEST_F(SmallObjectTest, MixedSizeClassAllocationsAreIsolated) {
     ASSERT_NE(ptr_16_byte_2, nullptr);
 
     // 3. 验证 ptr_16_byte_1 和 ptr_16_byte_2 来自同一个 Slab
-    auto* desc1 = MappedSegment::from_ptr(ptr_16_byte_1)->page_descriptor_from_ptr(ptr_16_byte_1);
-    auto* desc3 = MappedSegment::from_ptr(ptr_16_byte_2)->page_descriptor_from_ptr(ptr_16_byte_2);
+    auto* desc1 = MappedSegment::get_segment(ptr_16_byte_1)->get_page_desc(ptr_16_byte_1);
+    auto* desc3 = MappedSegment::get_segment(ptr_16_byte_2)->get_page_desc(ptr_16_byte_2);
     EXPECT_EQ(desc1->slab_ptr, desc3->slab_ptr) << "相同尺寸的第二次分配未能复用 Slab";
 
     // 4. 验证 ptr_64_byte_1 来自一个完全不同的 Slab
-    auto* desc2 = MappedSegment::from_ptr(ptr_64_byte_1)->page_descriptor_from_ptr(ptr_64_byte_1);
+    auto* desc2 = MappedSegment::get_segment(ptr_64_byte_1)->get_page_desc(ptr_64_byte_1);
     EXPECT_NE(desc1->slab_ptr, desc2->slab_ptr) << "不同尺寸的分配错误地使用了同一个 Slab";
 }
 
@@ -243,7 +243,7 @@ TEST_F(SmallObjectTest, InterleavedAllocationAndFree) {
         pointers.push_back(heap->allocate(alloc_size));
     }
     
-    auto* slab_ptr = MappedSegment::from_ptr(pointers[0])->page_descriptor_from_ptr(pointers[0])->slab_ptr;
+    auto* slab_ptr = MappedSegment::get_segment(pointers[0])->get_page_desc(pointers[0])->slab_ptr;
 
     // 2. 交错释放 (释放所有偶数索引的指针)
     for (size_t i = 0; i < capacity; i += 2) {
@@ -253,7 +253,7 @@ TEST_F(SmallObjectTest, InterleavedAllocationAndFree) {
     // 3. 重新分配，验证是否复用了被释放的空洞
     for (size_t i = 0; i < capacity / 2; ++i) {
         void* reused_ptr = heap->allocate(alloc_size);
-        auto* reused_slab_ptr = MappedSegment::from_ptr(reused_ptr)->page_descriptor_from_ptr(reused_ptr)->slab_ptr;
+        auto* reused_slab_ptr = MappedSegment::get_segment(reused_ptr)->get_page_desc(reused_ptr)->slab_ptr;
         // 验证新的分配仍然发生在这个部分空闲的 Slab 中
         EXPECT_EQ(reused_slab_ptr, slab_ptr) << "交错释放后，未能复用部分空闲的 Slab";
     }
@@ -268,7 +268,7 @@ TEST_F(SmallObjectTest, BoundarySizeAllocations) {
     // 1. 测试恰好是最大小对象的尺寸
     void* ptr_small_max = heap->allocate(MAX_SMALL_OBJECT_SIZE);
     ASSERT_NE(ptr_small_max, nullptr);
-    PageDescriptor* desc_small = MappedSegment::from_ptr(ptr_small_max)->page_descriptor_from_ptr(ptr_small_max);
+    PageDescriptor* desc_small = MappedSegment::get_segment(ptr_small_max)->get_page_desc(ptr_small_max);
     EXPECT_TRUE(desc_small->status == PageStatus::SMALL_SLAB || desc_small->status == PageStatus::SMALL_SLAB)
         << "分配 MAX_SMALL_OBJECT_SIZE 时未走小对象路径";
     heap->free(ptr_small_max);
@@ -276,7 +276,7 @@ TEST_F(SmallObjectTest, BoundarySizeAllocations) {
     // 2. 测试刚好超过最大小对象的尺寸
     void* ptr_large_min = heap->allocate(MAX_SMALL_OBJECT_SIZE + 1);
     ASSERT_NE(ptr_large_min, nullptr);
-    PageDescriptor* desc_large = MappedSegment::from_ptr(ptr_large_min)->page_descriptor_from_ptr(ptr_large_min);
+    PageDescriptor* desc_large = MappedSegment::get_segment(ptr_large_min)->get_page_desc(ptr_large_min);
     EXPECT_EQ(desc_large->status, PageStatus::LARGE_SLAB)
         << "分配 MAX_SMALL_OBJECT_SIZE + 1 时未走大对象路径";
     heap->free(ptr_large_min);
